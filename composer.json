@@ -1,0 +1,16 @@
+{
+    "name": "ax/student_violations",
+    "description": "Student Violations Management System with Microsoft 365 OAuth",
+    "type": "project",
+    "require": {
+        "microsoft/microsoft-graph": "^2.0"
+    },
+    "license": "MIT",
+    "minimum-stability": "stable",
+    "config": {
+        "allow-plugins": {
+            "php-http/discovery": true,
+            "tbachert/spi": true
+        }
+    }
+}
