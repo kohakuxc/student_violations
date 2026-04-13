@@ -16,6 +16,7 @@ $student_id = (int) $_SESSION['student_id'];
 $all_appointments      = $appointmentModel->getStudentAppointments($student_id);
 $upcoming_appointments = $appointmentModel->getStudentUpcomingAppointments($student_id);
 $counts                = $appointmentModel->getStudentAppointmentCounts($student_id);
+$activeTab = $_GET['tab'] ?? 'new-appointment';
 
 // Get categories for the new appointment form
 $categories = $appointmentModel->getAllCategories();
@@ -53,18 +54,18 @@ function getStatusBadgeColor($status) {
     <div class="card mb-4">
         <ul class="nav nav-tabs card-header-tabs" role="tablist" style="border-bottom:0;">
             <li class="nav-item">
-                <a class="nav-link active" id="new-appointment-tab" data-bs-toggle="tab"
+                <a class="nav-link <?php echo $activeTab === 'new-appointment' ? 'active' : ''; ?>" id="new-appointment-tab" data-bs-toggle="tab"
                    href="#new-appointment" role="tab">
                     <i class="fas fa-plus"></i> New Appointment
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" id="upcoming-tab" data-bs-toggle="tab" href="#upcoming" role="tab">
+                <a class="nav-link <?php echo $activeTab === 'upcoming' ? 'active' : ''; ?>" id="upcoming-tab" data-bs-toggle="tab" href="#upcoming" role="tab">
                     <i class="fas fa-calendar"></i> Upcoming
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" id="history-tab" data-bs-toggle="tab" href="#history" role="tab">
+                <a class="nav-link <?php echo $activeTab === 'history' ? 'active' : ''; ?>" id="history-tab" data-bs-toggle="tab" href="#history" role="tab">
                     <i class="fas fa-history"></i> History
                 </a>
             </li>
@@ -74,7 +75,7 @@ function getStatusBadgeColor($status) {
     <div class="tab-content">
 
         <!-- ===== New Appointment Tab ===== -->
-        <div id="new-appointment" class="tab-pane fade show active">
+        <div id="new-appointment" class="tab-pane fade <?php echo $activeTab === 'new-appointment' ? 'show active' : ''; ?>">
             <div class="card">
                 <div class="card-header bg-primary text-white">
                     <h5 class="mb-0"><i class="fas fa-file-alt"></i> Create New Appointment</h5>
@@ -156,7 +157,7 @@ function getStatusBadgeColor($status) {
         </div>
 
         <!-- ===== Upcoming Tab ===== -->
-        <div id="upcoming" class="tab-pane fade">
+        <div id="upcoming" class="tab-pane fade <?php echo $activeTab === 'upcoming' ? 'show active' : ''; ?>">
 
             <!-- Status Count Cards -->
             <?php if ($counts): ?>
@@ -271,7 +272,7 @@ function getStatusBadgeColor($status) {
         </div>
 
         <!-- ===== History Tab ===== -->
-        <div id="history" class="tab-pane fade">
+        <div id="history" class="tab-pane fade <?php echo $activeTab === 'history' ? 'show active' : ''; ?>">
             <div class="card">
                 <div class="card-header bg-primary text-white">
                     <h5 class="mb-0"><i class="fas fa-history"></i> Appointment History</h5>
@@ -438,11 +439,10 @@ document.getElementById('appointmentForm')?.addEventListener('submit', function 
 
     fetch('index.php', { method: 'POST', body: formData })
         .then(r => {
-            // createAppointment redirects, so handle gracefully
-            showToast('Appointment submitted successfully!', 'success');
-            this.reset();
-            document.getElementById('subcategory_id').disabled = true;
-            document.getElementById('time').disabled = true;
+            if (!r.ok) {
+                throw new Error('Appointment submission failed');
+            }
+            window.location.href = 'index.php?page=student_appointments&tab=history';
         })
         .catch(() => showToast('Error submitting appointment.', 'danger'));
 });

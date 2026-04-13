@@ -67,6 +67,7 @@ class AppointmentModel
 
             $query = "INSERT INTO appointments (
                     student_id,
+                    officer_id,
                     category_id,
                     subcategory_id,
                     description,
@@ -87,8 +88,10 @@ class AppointmentModel
             }
 
             $status = 'pending';
+            $officer_id = 1;
             $result = $stmt->execute([
                 (int) $student_id,
+                (int) $officer_id,
                 (int) $category_id,
                 (int) $subcategory_id,
                 (string) $description,
