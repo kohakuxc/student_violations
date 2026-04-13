@@ -583,11 +583,11 @@ function showToast(message, type) {
         c.style.cssText = 'position:fixed;top:20px;right:20px;z-index:9999;';
         document.body.appendChild(c);
     }
-    const t = document.createElement('div');
-    t.className = `alert alert-${type} alert-dismissible fade show shadow`;
-    t.innerHTML = `${message}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
-    c.appendChild(t);
-    setTimeout(() => t.remove(), 4000);
+    const toast = document.createElement('div');
+    toast.className = `alert alert-${type} alert-dismissible fade show shadow`;
+    toast.innerHTML = `${message}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+    c.appendChild(toast);
+    setTimeout(() => toast.remove(), 4000);
 }
 </script>
 
