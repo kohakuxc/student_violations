@@ -22,8 +22,6 @@
     </script>
 
     <script src="assets/js/sidebar.js"></script>
-    <!-- Include Student Appointments Script -->
-    <script src="assets/js/student_appointments.js"></script>
 </body>
 
 </html>
