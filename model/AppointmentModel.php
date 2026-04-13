@@ -176,76 +176,97 @@ class AppointmentModel
         }
     }
 
-    public function getAllAppointments($category_id = null, $status = null) {
+    public function getAllAppointments($category_id = null, $status = null, $search = null) {
     try {
-        // Start with basic query
-        $query = "SELECT * FROM dbo.appointments WHERE 1=1";
-        
+        $query = "SELECT a.*, o.name as officer_name
+                  FROM dbo.appointments a
+                  LEFT JOIN dbo.officers o ON a.officer_id = o.officer_id
+                  WHERE 1=1";
+        $params = [];
+
         if ($category_id) {
-            $query .= " AND category_id = " . intval($category_id);
+            $query .= " AND a.category_id = ?";
+            $params[] = (int) $category_id;
         }
-        
+
         if ($status) {
-            $query .= " AND status = '" . htmlspecialchars($status) . "'";
+            $query .= " AND a.status = ?";
+            $params[] = $status;
         }
-        
-        $query .= " ORDER BY scheduled_date DESC";
-        
-        error_log("DEBUG Query: " . $query);
-        
+
+        if ($search) {
+            $query .= " AND (CAST(a.student_id AS NVARCHAR) LIKE ? OR a.description LIKE ?)";
+            $params[] = '%' . $search . '%';
+            $params[] = '%' . $search . '%';
+        }
+
+        $query .= " ORDER BY a.scheduled_date DESC";
+
         $stmt = $this->conn->prepare($query);
-        $stmt->execute();
-        
-        $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        error_log("DEBUG Results count: " . count($results));
-        error_log("DEBUG Results: " . json_encode($results));
-        
-        return $results;
-        
+        $stmt->execute($params);
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+
     } catch (Exception $e) {
         error_log("Exception in getAllAppointments: " . $e->getMessage());
         return [];
     }
 }
 
-    // Get student's appointments
-    public function getStudentAppointments($student_id)
+    // Get student's appointments (with optional status filter, LEFT JOIN for officer)
+    public function getStudentAppointments($student_id, $status = null)
     {
-        $query = "SELECT a.*, 
-                         c.category_name, 
-                         s.subcategory_name,
-                         o.name as officer_name
-                  FROM dbo.appointments a
-                  JOIN dbo.appointment_categories c ON a.category_id = c.category_id
-                  JOIN dbo.appointment_subcategories s ON a.subcategory_id = s.subcategory_id
-                  JOIN dbo.officers o ON a.officer_id = o.officer_id
-                  WHERE a.student_id = ?
-                  ORDER BY a.created_at DESC";
+        try {
+            $query = "SELECT a.*, 
+                             c.category_name, 
+                             s.subcategory_name,
+                             o.name as officer_name
+                      FROM dbo.appointments a
+                      LEFT JOIN dbo.appointment_categories c ON a.category_id = c.category_id
+                      LEFT JOIN dbo.appointment_subcategories s ON a.subcategory_id = s.subcategory_id
+                      LEFT JOIN dbo.officers o ON a.officer_id = o.officer_id
+                      WHERE a.student_id = ?";
 
-        $stmt = $this->conn->prepare($query);
-        $stmt->execute([$student_id]);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $params = [$student_id];
+            if ($status) {
+                $query .= " AND a.status = ?";
+                $params[] = $status;
+            }
+            $query .= " ORDER BY a.created_at DESC";
+
+            $stmt = $this->conn->prepare($query);
+            $stmt->execute($params);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Exception $e) {
+            error_log("Exception in getStudentAppointments: " . $e->getMessage());
+            return [];
+        }
     }
 
     // Get upcoming appointments for student
     public function getStudentUpcomingAppointments($student_id)
     {
-        $query = "SELECT a.*, 
-                         c.category_name, 
-                         s.subcategory_name,
-                         o.name as officer_name
-                  FROM dbo.appointments a
-                  JOIN dbo.appointment_categories c ON a.category_id = c.category_id
-                  JOIN dbo.appointment_subcategories s ON a.subcategory_id = s.subcategory_id
-                  JOIN dbo.officers o ON a.officer_id = o.officer_id
-                  WHERE a.student_id = ? 
-                  AND a.status IN ('pending', 'approved', 'rescheduled')
-                  AND a.scheduled_date >= GETDATE()
-                  ORDER BY a.scheduled_date ASC";
+        try {
+            $query = "SELECT a.*, 
+                             c.category_name, 
+                             s.subcategory_name,
+                             o.name as officer_name
+                      FROM dbo.appointments a
+                      LEFT JOIN dbo.appointment_categories c ON a.category_id = c.category_id
+                      LEFT JOIN dbo.appointment_subcategories s ON a.subcategory_id = s.subcategory_id
+                      LEFT JOIN dbo.officers o ON a.officer_id = o.officer_id
+                      WHERE a.student_id = ? 
+                      AND a.status IN ('pending', 'approved', 'rescheduled')
+                      AND a.scheduled_date >= GETDATE()
+                      ORDER BY a.scheduled_date ASC";
 
-        $stmt = $this->conn->prepare($query);
-        $stmt->execute([$student_id]);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $stmt = $this->conn->prepare($query);
+            $stmt->execute([$student_id]);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Exception $e) {
+            error_log("Exception in getStudentUpcomingAppointments: " . $e->getMessage());
+            return [];
+        }
     }
 
     // Get appointment status counts for student
@@ -408,7 +429,10 @@ class AppointmentModel
     public function getAppointmentById($appointment_id) {
     try {
         $stmt = $this->conn->prepare("
-            SELECT * FROM dbo.appointments WHERE appointment_id = ?
+            SELECT a.*, o.name as officer_name
+            FROM dbo.appointments a
+            LEFT JOIN dbo.officers o ON a.officer_id = o.officer_id
+            WHERE a.appointment_id = ?
         ");
         $stmt->execute([$appointment_id]);
         
@@ -430,12 +454,98 @@ class AppointmentModel
     // Update appointment status
     public function updateAppointmentStatus($appointment_id, $status, $notes = null)
     {
-        $query = "UPDATE dbo.appointments 
-                  SET status = ?, notes = ?, updated_at = GETDATE() 
-                  WHERE appointment_id = ?";
+        try {
+            $query = "UPDATE dbo.appointments 
+                      SET status = ?, updated_at = GETDATE() 
+                      WHERE appointment_id = ?";
 
-        $stmt = $this->conn->prepare($query);
-        return $stmt->execute([$status, $notes, $appointment_id]);
+            $stmt = $this->conn->prepare($query);
+            return $stmt->execute([$status, $appointment_id]);
+        } catch (Exception $e) {
+            error_log("Exception in updateAppointmentStatus: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    // Assign officer to appointment
+    public function assignOfficer($appointment_id, $officer_id)
+    {
+        try {
+            $stmt = $this->conn->prepare(
+                "UPDATE dbo.appointments SET officer_id = ?, updated_at = GETDATE() WHERE appointment_id = ?"
+            );
+            return $stmt->execute([$officer_id, $appointment_id]);
+        } catch (Exception $e) {
+            error_log("Exception in assignOfficer: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    // Add a note to an appointment
+    public function addAppointmentNote($appointment_id, $note_text, $officer_id = null)
+    {
+        try {
+            $stmt = $this->conn->prepare(
+                "INSERT INTO dbo.appointment_notes (appointment_id, note_text, officer_id, created_at)
+                 VALUES (?, ?, ?, GETDATE())"
+            );
+            return $stmt->execute([$appointment_id, $note_text, $officer_id]);
+        } catch (Exception $e) {
+            error_log("Exception in addAppointmentNote: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    // Get all notes for an appointment
+    public function getAppointmentNotes($appointment_id)
+    {
+        try {
+            $stmt = $this->conn->prepare(
+                "SELECT n.*, o.name as officer_name
+                 FROM dbo.appointment_notes n
+                 LEFT JOIN dbo.officers o ON n.officer_id = o.officer_id
+                 WHERE n.appointment_id = ?
+                 ORDER BY n.created_at ASC"
+            );
+            $stmt->execute([$appointment_id]);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Exception $e) {
+            error_log("Exception in getAppointmentNotes: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    // Get all appointments assigned to a specific officer (or all if officer_id is null)
+    public function getOfficerAssignedAppointments($officer_id = null, $status = null)
+    {
+        try {
+            $query = "SELECT a.*, 
+                             c.category_name,
+                             s.subcategory_name,
+                             o.name as officer_name
+                      FROM dbo.appointments a
+                      LEFT JOIN dbo.appointment_categories c ON a.category_id = c.category_id
+                      LEFT JOIN dbo.appointment_subcategories s ON a.subcategory_id = s.subcategory_id
+                      LEFT JOIN dbo.officers o ON a.officer_id = o.officer_id
+                      WHERE 1=1";
+            $params = [];
+            if ($officer_id !== null) {
+                $query .= " AND a.officer_id = ?";
+                $params[] = (int) $officer_id;
+            }
+            if ($status) {
+                $query .= " AND a.status = ?";
+                $params[] = $status;
+            }
+            $query .= " ORDER BY a.scheduled_date DESC";
+
+            $stmt = $this->conn->prepare($query);
+            $stmt->execute($params);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Exception $e) {
+            error_log("Exception in getOfficerAssignedAppointments: " . $e->getMessage());
+            return [];
+        }
     }
 
     // Reschedule appointment
@@ -567,11 +677,11 @@ class AppointmentModel
         try {
             $this->conn->beginTransaction();
 
-            // Update appointment status back to pending
-            $this->updateAppointmentStatus($appointment_id, 'pending');
+            // Update appointment status to rejected
+            $this->updateAppointmentStatus($appointment_id, 'rejected');
 
-            // Add rejection reason
-            $this->addReason($appointment_id, 'rejection', $reason, $officer_id);
+            // Add rejection reason as a note
+            $this->addAppointmentNote($appointment_id, 'Rejected: ' . $reason, $officer_id);
 
             $this->conn->commit();
             return true;
