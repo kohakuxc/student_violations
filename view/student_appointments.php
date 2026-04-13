@@ -435,12 +435,12 @@ document.getElementById('date')?.addEventListener('change', function () {
 document.getElementById('appointmentForm')?.addEventListener('submit', function (e) {
     e.preventDefault();
     const formData = new FormData(this);
-    formData.append('action', 'createAppointment');
 
-    fetch('index.php', { method: 'POST', body: formData })
-        .then(r => {
-            if (!r.ok) {
-                throw new Error('Appointment submission failed');
+    fetch('api/create_appointment.php', { method: 'POST', body: formData })
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success) {
+                throw new Error(data.message || 'Appointment submission failed');
             }
             window.location.href = 'index.php?page=student_appointments&tab=history';
         })
