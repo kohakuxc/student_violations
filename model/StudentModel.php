@@ -123,5 +123,36 @@ class StudentModel
             return [];
         }
     }
+
+    /**
+     * Get student with formatted name (for appointments)
+     * Splits 'name' into 'first_name' and 'last_name'
+     */
+    public function getStudentByIdForAppointments($student_id)
+    {
+        try {
+            $query = "SELECT student_id, name, student_number, email, created_at 
+                      FROM students 
+                      WHERE student_id = ?";
+
+            $stmt = $this->conn->prepare($query);
+            $stmt->execute([$student_id]);
+
+            $student = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($student && isset($student['name'])) {
+                // Split name into first_name and last_name
+                $names = explode(' ', trim($student['name']), 2);
+                $student['first_name'] = $names[0] ?? '';
+                $student['last_name'] = $names[1] ?? '';
+            }
+            
+            return $student;
+
+        } catch (PDOException $e) {
+            error_log("Get Student for Appointments Error: " . $e->getMessage());
+            return null;
+        }
+    }
 }
 ?>

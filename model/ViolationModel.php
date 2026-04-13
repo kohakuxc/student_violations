@@ -119,9 +119,9 @@ class ViolationModel
             if ($limit < 1)
                 $limit = 4;
 
-            // PostgreSQL syntax instead of SQL Server
             $query = "
             SELECT
+                     TOP ($limit)
                    v.violation_id,
                    v.description,
                    v.date_of_violation,
@@ -134,7 +134,6 @@ class ViolationModel
             JOIN officers o ON v.officer_id = o.officer_id
             LEFT JOIN violation_types vt ON v.violation_type = vt.violation_type_id
             ORDER BY v.created_at DESC
-            LIMIT $limit
         ";
 
             $stmt = $this->conn->prepare($query);
