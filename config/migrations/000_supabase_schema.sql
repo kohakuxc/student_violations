@@ -93,3 +93,39 @@ create index if not exists idx_appointments_status on public.appointments(status
 create index if not exists idx_appointments_scheduled_date on public.appointments(scheduled_date);
 create index if not exists idx_appointment_notes_appointment_id on public.appointment_notes(appointment_id);
 create index if not exists idx_appointment_reasons_appointment_id on public.appointment_reasons(appointment_id);
+
+-- Seed appointment categories used by the UI and config constants.
+insert into public.appointment_categories (category_id, category_name)
+values
+    (1, 'Attendance & Administrative Appointments'),
+    (2, 'Behavioral & Disciplinary Meetings'),
+    (3, 'Safety & Counseling Referrals'),
+    (4, 'Special Hearings')
+on conflict (category_id) do update
+set category_name = excluded.category_name;
+
+insert into public.appointment_subcategories (subcategory_id, category_id, subcategory_name)
+values
+    (1, 1, 'Uniform Exemption / Gate Pass'),
+    (2, 1, 'Violation Review'),
+    (3, 1, 'Obtaining Certificates'),
+    (4, 2, 'Parent-Teacher Conference'),
+    (5, 2, 'Investigation Hearing'),
+    (6, 2, 'Behavioral Reports'),
+    (7, 3, 'Mediation between Peers'),
+    (8, 3, 'Confiscated Item Retrieval'),
+    (9, 3, 'Counseling Meeting'),
+    (10, 4, 'Suspension Appeal'),
+    (11, 4, 'Re-admission Interview'),
+    (12, 4, 'Instructor Review')
+on conflict (subcategory_id) do update
+set category_id = excluded.category_id,
+    subcategory_name = excluded.subcategory_name;
+
+select setval(pg_get_serial_sequence('public.appointment_categories', 'category_id'),
+              (select coalesce(max(category_id), 1) from public.appointment_categories),
+              true);
+
+select setval(pg_get_serial_sequence('public.appointment_subcategories', 'subcategory_id'),
+              (select coalesce(max(subcategory_id), 1) from public.appointment_subcategories),
+              true);
