@@ -5,6 +5,16 @@ class AppointmentModel
 {
     private $conn;
 
+    private function driverName()
+    {
+        return $this->conn->getAttribute(PDO::ATTR_DRIVER_NAME);
+    }
+
+    private function isPgsql()
+    {
+        return $this->driverName() === 'pgsql';
+    }
+
     public function __construct()
     {
         global $conn;
@@ -17,7 +27,7 @@ class AppointmentModel
         try {
             $stmt = $this->conn->prepare("
             SELECT category_id, category_name 
-            FROM dbo.appointment_categories 
+            FROM appointment_categories 
             ORDER BY category_name
         ");
             $stmt->execute();
@@ -33,7 +43,7 @@ class AppointmentModel
     // Get subcategories by category_id
     public function getSubcategoriesByCategory($category_id)
     {
-        $query = "SELECT subcategory_id, subcategory_name FROM dbo.appointment_subcategories 
+        $query = "SELECT subcategory_id, subcategory_name FROM appointment_subcategories 
                   WHERE category_id = ? ORDER BY subcategory_id";
         $stmt = $this->conn->prepare($query);
         $stmt->execute([$category_id]);
@@ -55,7 +65,7 @@ class AppointmentModel
                 return false;
             }
 
-            $query = "INSERT INTO dbo.appointments (
+            $query = "INSERT INTO appointments (
                     student_id,
                     category_id,
                     subcategory_id,
@@ -64,7 +74,7 @@ class AppointmentModel
                     evidence_image,
                     status,
                     created_at
-                  ) VALUES (?, ?, ?, ?, ?, ?, ?, GETDATE())";
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)";
 
             file_put_contents($log_file, "[" . date('Y-m-d H:i:s') . "] SQL Query prepared\n", FILE_APPEND);
 
@@ -119,7 +129,7 @@ class AppointmentModel
             // Today's appointments
             $stmt = $this->conn->prepare("
             SELECT COUNT(*) as count 
-            FROM dbo.appointments 
+            FROM appointments 
             WHERE CAST(scheduled_date AS DATE) = ?
         ");
             $stmt->execute([$today]);
@@ -131,7 +141,7 @@ class AppointmentModel
             // Pending appointments
             $stmt = $this->conn->prepare("
             SELECT COUNT(*) as count 
-            FROM dbo.appointments 
+            FROM appointments 
             WHERE status = ?
         ");
             $stmt->execute(['pending']);
@@ -143,7 +153,7 @@ class AppointmentModel
             // Completed this month
             $stmt = $this->conn->prepare("
             SELECT COUNT(*) as count 
-            FROM dbo.appointments 
+            FROM appointments 
             WHERE status = ? AND CAST(scheduled_date AS DATE) >= ?
         ");
             $stmt->execute(['completed', $month_start]);
@@ -155,7 +165,7 @@ class AppointmentModel
             // Total
             $stmt = $this->conn->prepare("
             SELECT COUNT(*) as count 
-            FROM dbo.appointments
+            FROM appointments
         ");
             $stmt->execute();
             $row = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -179,8 +189,8 @@ class AppointmentModel
     public function getAllAppointments($category_id = null, $status = null, $search = null) {
     try {
         $query = "SELECT a.*, o.name as officer_name
-                  FROM dbo.appointments a
-                  LEFT JOIN dbo.officers o ON a.officer_id = o.officer_id
+              FROM appointments a
+              LEFT JOIN officers o ON a.officer_id = o.officer_id
                   WHERE 1=1";
         $params = [];
 
@@ -195,7 +205,11 @@ class AppointmentModel
         }
 
         if ($search) {
-            $query .= " AND (CAST(a.student_id AS NVARCHAR) LIKE ? OR a.description LIKE ?)";
+            if ($this->isPgsql()) {
+                $query .= " AND (CAST(a.student_id AS TEXT) LIKE ? OR a.description LIKE ?)";
+            } else {
+                $query .= " AND (CAST(a.student_id AS NVARCHAR(50)) LIKE ? OR a.description LIKE ?)";
+            }
             $params[] = '%' . $search . '%';
             $params[] = '%' . $search . '%';
         }
@@ -221,10 +235,10 @@ class AppointmentModel
                              c.category_name, 
                              s.subcategory_name,
                              o.name as officer_name
-                      FROM dbo.appointments a
-                      LEFT JOIN dbo.appointment_categories c ON a.category_id = c.category_id
-                      LEFT JOIN dbo.appointment_subcategories s ON a.subcategory_id = s.subcategory_id
-                      LEFT JOIN dbo.officers o ON a.officer_id = o.officer_id
+                     FROM appointments a
+                      LEFT JOIN appointment_categories c ON a.category_id = c.category_id
+                      LEFT JOIN appointment_subcategories s ON a.subcategory_id = s.subcategory_id
+                      LEFT JOIN officers o ON a.officer_id = o.officer_id
                       WHERE a.student_id = ?";
 
             $params = [$student_id];
@@ -251,13 +265,13 @@ class AppointmentModel
                              c.category_name, 
                              s.subcategory_name,
                              o.name as officer_name
-                      FROM dbo.appointments a
-                      LEFT JOIN dbo.appointment_categories c ON a.category_id = c.category_id
-                      LEFT JOIN dbo.appointment_subcategories s ON a.subcategory_id = s.subcategory_id
-                      LEFT JOIN dbo.officers o ON a.officer_id = o.officer_id
+                     FROM appointments a
+                     LEFT JOIN appointment_categories c ON a.category_id = c.category_id
+                     LEFT JOIN appointment_subcategories s ON a.subcategory_id = s.subcategory_id
+                     LEFT JOIN officers o ON a.officer_id = o.officer_id
                       WHERE a.student_id = ? 
                       AND a.status IN ('pending', 'approved', 'rescheduled')
-                      AND a.scheduled_date >= GETDATE()
+                     AND a.scheduled_date >= CURRENT_TIMESTAMP
                       ORDER BY a.scheduled_date ASC";
 
             $stmt = $this->conn->prepare($query);
@@ -280,7 +294,7 @@ class AppointmentModel
                     SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END) as rejected_count,
                     SUM(CASE WHEN status = 'rescheduled' THEN 1 ELSE 0 END) as rescheduled_count,
                     SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) as cancelled_count
-                  FROM dbo.appointments
+                  FROM appointments
                   WHERE student_id = ?";
 
         $stmt = $this->conn->prepare($query);
@@ -302,13 +316,12 @@ class AppointmentModel
             $query = "SELECT a.*, 
                          c.category_name, 
                          s.subcategory_name,
-                         st.first_name,
-                         st.last_name,
+                        st.name as student_name,
                          st.email
-                  FROM dbo.appointments a
-                  JOIN dbo.appointment_categories c ON a.category_id = c.category_id
-                  JOIN dbo.appointment_subcategories s ON a.subcategory_id = s.subcategory_id
-                  JOIN dbo.students st ON a.student_id = st.student_id
+                    FROM appointments a
+                    JOIN appointment_categories c ON a.category_id = c.category_id
+                    JOIN appointment_subcategories s ON a.subcategory_id = s.subcategory_id
+                    JOIN students st ON a.student_id = st.student_id
                   WHERE a.officer_id = ?";
 
             $params = [$officer_id];
@@ -323,9 +336,15 @@ class AppointmentModel
                 $params[] = $status;
             }
 
-            $query .= " ORDER BY a.scheduled_date DESC OFFSET ? ROWS FETCH NEXT ? ROWS ONLY";
-            $params[] = $offset;
-            $params[] = $per_page;
+            if ($this->isPgsql()) {
+                $query .= " ORDER BY a.scheduled_date DESC LIMIT ? OFFSET ?";
+                $params[] = $per_page;
+                $params[] = $offset;
+            } else {
+                $query .= " ORDER BY a.scheduled_date DESC OFFSET ? ROWS FETCH NEXT ? ROWS ONLY";
+                $params[] = $offset;
+                $params[] = $per_page;
+            }
 
             $stmt = $this->conn->prepare($query);
             if (!$stmt) {
@@ -343,7 +362,7 @@ class AppointmentModel
     // Get total appointments count for officer (for pagination)
     public function getOfficerAppointmentsCount($officer_id, $category_id = null, $status = null)
     {
-        $query = "SELECT COUNT(*) as total FROM dbo.appointments WHERE officer_id = ?";
+        $query = "SELECT COUNT(*) as total FROM appointments WHERE officer_id = ?";
         $params = [$officer_id];
 
         if ($category_id) {
@@ -367,14 +386,13 @@ class AppointmentModel
         $query = "SELECT a.*, 
                          c.category_name, 
                          s.subcategory_name,
-                         st.first_name,
-                         st.last_name
-                  FROM dbo.appointments a
-                  JOIN dbo.appointment_categories c ON a.category_id = c.category_id
-                  JOIN dbo.appointment_subcategories s ON a.subcategory_id = s.subcategory_id
-                  JOIN dbo.students st ON a.student_id = st.student_id
+                    st.name as student_name
+                FROM appointments a
+                JOIN appointment_categories c ON a.category_id = c.category_id
+                JOIN appointment_subcategories s ON a.subcategory_id = s.subcategory_id
+                JOIN students st ON a.student_id = st.student_id
                   WHERE a.officer_id = ? 
-                  AND CAST(a.scheduled_date AS DATE) = CAST(GETDATE() AS DATE)
+                AND CAST(a.scheduled_date AS DATE) = CAST(CURRENT_TIMESTAMP AS DATE)
                   AND a.status IN ('approved', 'in_progress')
                   ORDER BY a.scheduled_date ASC";
 
@@ -390,16 +408,29 @@ class AppointmentModel
         try {
             $officer_id = (int) $officer_id;
 
-            $query = "SELECT 
-                    (SELECT COUNT(*) FROM dbo.appointments 
-                     WHERE officer_id = ? AND CAST(scheduled_date AS DATE) = CAST(GETDATE() AS DATE) 
+                if ($this->isPgsql()) {
+                $query = "SELECT 
+                    (SELECT COUNT(*) FROM appointments 
+                     WHERE officer_id = ? AND CAST(scheduled_date AS DATE) = CAST(CURRENT_TIMESTAMP AS DATE) 
                      AND status IN ('approved', 'in_progress')) as today_count,
-                    (SELECT COUNT(*) FROM dbo.appointments 
+                    (SELECT COUNT(*) FROM appointments 
                      WHERE officer_id = ? AND status = 'pending') as pending_count,
-                    (SELECT COUNT(*) FROM dbo.appointments 
+                    (SELECT COUNT(*) FROM appointments 
                      WHERE officer_id = ? AND status = 'completed' 
-                     AND MONTH(scheduled_date) = MONTH(GETDATE()) 
-                     AND YEAR(scheduled_date) = YEAR(GETDATE())) as completed_this_month";
+                     AND EXTRACT(MONTH FROM scheduled_date) = EXTRACT(MONTH FROM CURRENT_TIMESTAMP)
+                     AND EXTRACT(YEAR FROM scheduled_date) = EXTRACT(YEAR FROM CURRENT_TIMESTAMP)) as completed_this_month";
+                } else {
+                $query = "SELECT 
+                    (SELECT COUNT(*) FROM appointments 
+                     WHERE officer_id = ? AND CAST(scheduled_date AS DATE) = CAST(CURRENT_TIMESTAMP AS DATE) 
+                     AND status IN ('approved', 'in_progress')) as today_count,
+                    (SELECT COUNT(*) FROM appointments 
+                     WHERE officer_id = ? AND status = 'pending') as pending_count,
+                    (SELECT COUNT(*) FROM appointments 
+                     WHERE officer_id = ? AND status = 'completed' 
+                     AND MONTH(scheduled_date) = MONTH(CURRENT_TIMESTAMP) 
+                     AND YEAR(scheduled_date) = YEAR(CURRENT_TIMESTAMP)) as completed_this_month";
+                }
 
             $stmt = $this->conn->prepare($query);
             if (!$stmt) {
@@ -430,8 +461,8 @@ class AppointmentModel
     try {
         $stmt = $this->conn->prepare("
             SELECT a.*, o.name as officer_name
-            FROM dbo.appointments a
-            LEFT JOIN dbo.officers o ON a.officer_id = o.officer_id
+            FROM appointments a
+            LEFT JOIN officers o ON a.officer_id = o.officer_id
             WHERE a.appointment_id = ?
         ");
         $stmt->execute([$appointment_id]);
@@ -455,8 +486,8 @@ class AppointmentModel
     public function updateAppointmentStatus($appointment_id, $status, $notes = null)
     {
         try {
-            $query = "UPDATE dbo.appointments 
-                      SET status = ?, updated_at = GETDATE() 
+            $query = "UPDATE appointments 
+                      SET status = ?, updated_at = CURRENT_TIMESTAMP 
                       WHERE appointment_id = ?";
 
             $stmt = $this->conn->prepare($query);
@@ -472,7 +503,7 @@ class AppointmentModel
     {
         try {
             $stmt = $this->conn->prepare(
-                "UPDATE dbo.appointments SET officer_id = ?, updated_at = GETDATE() WHERE appointment_id = ?"
+                "UPDATE appointments SET officer_id = ?, updated_at = CURRENT_TIMESTAMP WHERE appointment_id = ?"
             );
             return $stmt->execute([$officer_id, $appointment_id]);
         } catch (Exception $e) {
@@ -486,8 +517,8 @@ class AppointmentModel
     {
         try {
             $stmt = $this->conn->prepare(
-                "INSERT INTO dbo.appointment_notes (appointment_id, note_text, officer_id, created_at)
-                 VALUES (?, ?, ?, GETDATE())"
+                                "INSERT INTO appointment_notes (appointment_id, note_text, officer_id, created_at)
+                  VALUES (?, ?, ?, CURRENT_TIMESTAMP)"
             );
             return $stmt->execute([$appointment_id, $note_text, $officer_id]);
         } catch (Exception $e) {
@@ -502,8 +533,8 @@ class AppointmentModel
         try {
             $stmt = $this->conn->prepare(
                 "SELECT n.*, o.name as officer_name
-                 FROM dbo.appointment_notes n
-                 LEFT JOIN dbo.officers o ON n.officer_id = o.officer_id
+                  FROM appointment_notes n
+                  LEFT JOIN officers o ON n.officer_id = o.officer_id
                  WHERE n.appointment_id = ?
                  ORDER BY n.created_at ASC"
             );
@@ -523,10 +554,10 @@ class AppointmentModel
                              c.category_name,
                              s.subcategory_name,
                              o.name as officer_name
-                      FROM dbo.appointments a
-                      LEFT JOIN dbo.appointment_categories c ON a.category_id = c.category_id
-                      LEFT JOIN dbo.appointment_subcategories s ON a.subcategory_id = s.subcategory_id
-                      LEFT JOIN dbo.officers o ON a.officer_id = o.officer_id
+                     FROM appointments a
+                     LEFT JOIN appointment_categories c ON a.category_id = c.category_id
+                     LEFT JOIN appointment_subcategories s ON a.subcategory_id = s.subcategory_id
+                     LEFT JOIN officers o ON a.officer_id = o.officer_id
                       WHERE 1=1";
             $params = [];
             if ($officer_id !== null) {
@@ -558,8 +589,8 @@ class AppointmentModel
             $current = $this->getAppointmentById($appointment_id);
 
             // Update current to rescheduled
-            $query = "UPDATE dbo.appointments 
-                      SET status = 'rescheduled', scheduled_date = ?, updated_at = GETDATE()
+            $query = "UPDATE appointments 
+                      SET status = 'rescheduled', scheduled_date = ?, updated_at = CURRENT_TIMESTAMP
                       WHERE appointment_id = ?";
             $stmt = $this->conn->prepare($query);
             $stmt->execute([$new_date, $appointment_id]);
@@ -576,9 +607,9 @@ class AppointmentModel
     // Add rejection/cancellation reason
     public function addReason($appointment_id, $reason_type, $reason_text, $created_by)
     {
-        $query = "INSERT INTO dbo.appointment_reasons 
+        $query = "INSERT INTO appointment_reasons 
                   (appointment_id, reason_type, reason_text, created_by, created_at)
-                  VALUES (?, ?, ?, ?, GETDATE())";
+              VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)";
 
         $stmt = $this->conn->prepare($query);
         return $stmt->execute([$appointment_id, $reason_type, $reason_text, $created_by]);
@@ -587,10 +618,16 @@ class AppointmentModel
     // Get rejection/cancellation reason
     public function getReasonByAppointmentId($appointment_id)
     {
-        $query = "SELECT * FROM dbo.appointment_reasons 
-                  WHERE appointment_id = ? 
-                  ORDER BY created_at DESC 
-                  LIMIT 1";
+        if ($this->isPgsql()) {
+            $query = "SELECT * FROM appointment_reasons 
+                      WHERE appointment_id = ? 
+                      ORDER BY created_at DESC 
+                      LIMIT 1";
+        } else {
+            $query = "SELECT TOP (1) * FROM appointment_reasons 
+                      WHERE appointment_id = ? 
+                      ORDER BY created_at DESC";
+        }
 
         $stmt = $this->conn->prepare($query);
         $stmt->execute([$appointment_id]);
@@ -604,10 +641,17 @@ class AppointmentModel
         try {
             $officer_id = (int) $officer_id;
 
-            $query = "SELECT COUNT(*) as count FROM dbo.appointments 
-                  WHERE officer_id = ? 
-                  AND ABS(DATEDIFF(MINUTE, scheduled_date, ?)) < 60
-                  AND status NOT IN ('cancelled', 'rejected')";
+            if ($this->isPgsql()) {
+                $query = "SELECT COUNT(*) as count FROM appointments
+                    WHERE officer_id = ?
+                    AND ABS(EXTRACT(EPOCH FROM (scheduled_date - CAST(? AS timestamp)))) < 3600
+                    AND status NOT IN ('cancelled', 'rejected')";
+            } else {
+                $query = "SELECT COUNT(*) as count FROM appointments 
+                    WHERE officer_id = ? 
+                    AND ABS(DATEDIFF(MINUTE, scheduled_date, ?)) < 60
+                    AND status NOT IN ('cancelled', 'rejected')";
+            }
 
             $params = [$officer_id, $scheduled_date];
 

@@ -89,8 +89,8 @@ define('EMAIL_TEMPLATES_DIR', __DIR__ . '/../templates/emails/');
 define('UPLOAD_DIR', __DIR__ . '/../uploads/appointments/');
 
 // Database settings
-define('DB_TABLE_APPOINTMENTS', 'dbo.appointments');
-define('DB_TABLE_CATEGORIES', 'dbo.appointment_categories');
-define('DB_TABLE_SUBCATEGORIES', 'dbo.appointment_subcategories');
-define('DB_TABLE_REASONS', 'dbo.appointment_reasons');
+define('DB_TABLE_APPOINTMENTS', 'appointments');
+define('DB_TABLE_CATEGORIES', 'appointment_categories');
+define('DB_TABLE_SUBCATEGORIES', 'appointment_subcategories');
+define('DB_TABLE_REASONS', 'appointment_reasons');
 ?>
