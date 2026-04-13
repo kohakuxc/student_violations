@@ -15,6 +15,12 @@ $studentAuthModel = new StudentAuthModel();
 $error = "";
 $login_url = "";
 
+function redirectStudentError($message)
+{
+    header('Location: index.php?page=login&tab=student-login&student_error=' . urlencode($message));
+    exit();
+}
+
 // Step 1: Generate login URL
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && !isset($_GET['code']) && !isset($_GET['error'])) {
     $login_url = $studentAuthModel->generateAuthorizationUrl();
@@ -32,61 +38,57 @@ if (isset($_GET['code'])) {
         $profile = $studentAuthModel->getUserProfile($tokenResult['access_token']);
 
         if ($profile) {
-            $email = $profile['mail'];
-            $microsoft_id = $profile['id'];
+            $email = strtolower(trim($profile['mail'] ?? $profile['userPrincipalName'] ?? ''));
+            $microsoft_id = $profile['id'] ?? '';
 
             // Validate email domain
             if (!$studentAuthModel->isValidEmailDomain($email)) {
-                $error = "❌ Only @fairview.sti.edu.ph email addresses are allowed.";
+                redirectStudentError('Only @fairview.sti.edu.ph email addresses are allowed.');
             } else {
-                // Find student by email
-                $student = $studentAuthModel->findStudentByEmail($email);
+                $studentResult = $studentAuthModel->findOrCreateStudentByMicrosoftProfile($profile, $tokenResult['access_token']);
 
-                if ($student) {
-                    // Update student with Microsoft OAuth data
-                    $updateResult = $studentAuthModel->updateStudentOAuthData(
+                if (!empty($studentResult['success']) && !empty($studentResult['student'])) {
+                    $student = $studentResult['student'];
+
+                    // Create student session
+                    $sessionResult = $studentAuthModel->createStudentSession(
                         $student['student_id'],
-                        $microsoft_id,
-                        $tokenResult['access_token']
+                        $student['name'],
+                        $student['email']
                     );
 
-                    if ($updateResult['success']) {
-                        // Create student session
-                        $sessionResult = $studentAuthModel->createStudentSession(
-                            $student['student_id'],
-                            $student['name'],
-                            $email
-                        );
+                    if ($sessionResult['success']) {
+                        // Clear OAuth session data
+                        unset($_SESSION['oauth_state']);
+                        unset($_SESSION['oauth_code_verifier']);
 
-                        if ($sessionResult['success']) {
-                            // Clear OAuth session data
-                            unset($_SESSION['oauth_state']);
-                            unset($_SESSION['oauth_code_verifier']);
-
-                            header("Location: index.php?page=student_dashboard");
-                            exit();
-                        } else {
-                            $error = "❌ Session creation failed.";
-                        }
-                    } else {
-                        $error = "❌ Failed to update authentication data.";
+                        header("Location: index.php?page=student_dashboard");
+                        exit();
                     }
+
+                    redirectStudentError('Session creation failed. Please try again.');
                 } else {
-                    $error = "❌ Student account not found. Please contact the administration.";
+                    redirectStudentError($studentResult['message'] ?? 'Failed to provision student account.');
                 }
             }
         } else {
-            $error = "❌ Failed to retrieve user profile from Microsoft 365.";
+            redirectStudentError('Failed to retrieve user profile from Microsoft 365.');
         }
     } else {
-        $error = "❌ " . $tokenResult['message'];
+        if (($tokenResult['error_code'] ?? '') === 'invalid_grant') {
+            unset($_SESSION['oauth_state']);
+            unset($_SESSION['oauth_code_verifier']);
+            redirectStudentError($tokenResult['message']);
+        }
+
+        redirectStudentError($tokenResult['message']);
     }
 }
 
 // Step 3: Handle OAuth errors
 if (isset($_GET['error'])) {
-    $error = "❌ Authentication failed: " . htmlspecialchars($_GET['error_description'] ?? $_GET['error']);
+    redirectStudentError('Authentication failed: ' . ($_GET['error_description'] ?? $_GET['error']));
 }
 
-include 'view/student_login.php';
+include 'view/login.php';
 ?>

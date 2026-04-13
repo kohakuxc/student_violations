@@ -19,7 +19,7 @@ define('MICROSOFT_TOKEN_URL', 'https://login.microsoftonline.com/' . MICROSOFT_T
 define('MICROSOFT_GRAPH_URL', 'https://graph.microsoft.com/v1.0/me');
 
 // Required scopes for reading user profile
-define('MICROSOFT_SCOPES', 'openid profile email');
+define('MICROSOFT_SCOPES', getenv('MICROSOFT_SCOPES') ?: 'openid profile email User.Read');
 
 // Fairview STI allowed email domain
 define('ALLOWED_EMAIL_DOMAIN', '@fairview.sti.edu.ph');

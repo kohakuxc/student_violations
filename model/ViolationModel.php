@@ -119,22 +119,43 @@ class ViolationModel
             if ($limit < 1)
                 $limit = 4;
 
-            $query = "
-            SELECT
-                     TOP ($limit)
-                   v.violation_id,
-                   v.description,
-                   v.date_of_violation,
-                   v.created_at,
-                   s.name AS student_name,
-                   o.name AS officer_name,
-                   COALESCE(vt.severity_level, 'unknown') AS severity_level
-            FROM violations v
-            JOIN students s ON v.student_id = s.student_id
-            JOIN officers o ON v.officer_id = o.officer_id
-            LEFT JOIN violation_types vt ON v.violation_type = vt.violation_type_id
-            ORDER BY v.created_at DESC
-        ";
+            $driver = $this->conn->getAttribute(PDO::ATTR_DRIVER_NAME);
+
+            if ($driver === 'pgsql') {
+                $query = "
+                SELECT
+                       v.violation_id,
+                       v.description,
+                       v.date_of_violation,
+                       v.created_at,
+                       s.name AS student_name,
+                       o.name AS officer_name,
+                       COALESCE(vt.severity_level, 'unknown') AS severity_level
+                FROM violations v
+                JOIN students s ON v.student_id = s.student_id
+                JOIN officers o ON v.officer_id = o.officer_id
+                LEFT JOIN violation_types vt ON v.violation_type = vt.violation_type_id
+                ORDER BY v.created_at DESC
+                LIMIT $limit
+            ";
+            } else {
+                $query = "
+                SELECT
+                       TOP ($limit)
+                       v.violation_id,
+                       v.description,
+                       v.date_of_violation,
+                       v.created_at,
+                       s.name AS student_name,
+                       o.name AS officer_name,
+                       COALESCE(vt.severity_level, 'unknown') AS severity_level
+                FROM violations v
+                JOIN students s ON v.student_id = s.student_id
+                JOIN officers o ON v.officer_id = o.officer_id
+                LEFT JOIN violation_types vt ON v.violation_type = vt.violation_type_id
+                ORDER BY v.created_at DESC
+            ";
+            }
 
             $stmt = $this->conn->prepare($query);
             $stmt->execute();

@@ -1,3 +1,6 @@
+<?php
+$showStudentTab = (($_GET['tab'] ?? '') === 'student-login') || isset($_GET['student_error']);
+?>
 <!DOCTYPE html>
 <html lang="en">
 
@@ -310,17 +313,17 @@
 
                 <!-- Tab Navigation -->
                 <div class="login-tabs">
-                    <button class="login-tab-button" data-tab="student-login">
+                    <button class="login-tab-button <?php echo $showStudentTab ? 'active' : ''; ?>" data-tab="student-login">
                         👤 Student
                     </button>
 
-                    <button class="login-tab-button active" data-tab="admin-login">
+                    <button class="login-tab-button <?php echo $showStudentTab ? '' : 'active'; ?>" data-tab="admin-login">
                         👮 Admin
                     </button>
                 </div>
 
                 <!-- Admin Login Tab -->
-                <div id="admin-login" class="tab-content active">
+                <div id="admin-login" class="tab-content <?php echo $showStudentTab ? '' : 'active'; ?>">
                     <h1 style="text-align: center; font-size: 22px; color: #2c3e50; margin: 0 0 18px;">Admin Login
                     </h1>
 
@@ -352,7 +355,7 @@
                 </div>
 
                 <!-- Student Login Tab -->
-                <div id="student-login" class="tab-content">
+                <div id="student-login" class="tab-content <?php echo $showStudentTab ? 'active' : ''; ?>">
                     <h1 style="text-align: center; font-size: 22px; color: #2c3e50; margin: 0 0 8px;">Student Login
                     </h1>
                     <p style="text-align: center; color: #666; font-size: 13px; margin: 0 0 18px;">
