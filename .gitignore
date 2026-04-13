@@ -18,7 +18,6 @@ config/.env.local
 !/uploads/appointments/.gitkeep
 
 # Debug/local-only scripts
-/api/debug_appointments.php
 /test_student_login.php
 
 # IDE/editor files
