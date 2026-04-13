@@ -23,6 +23,7 @@ config/.env.local
 
 # IDE/editor files
 .vscode/
+.vs/
 .idea/
 *.swp
 *.swo

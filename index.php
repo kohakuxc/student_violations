@@ -6,14 +6,6 @@
 
 session_start();
 
-if (isset($_GET['test_student']) && $_GET['test_student'] === 'yes') {
-    $_SESSION['student_id'] = 1;
-    $_SESSION['student_name'] = 'Test Student';
-    $_SESSION['student_email'] = 'teststudent@school.edu.ph';
-    header('Location: index.php?page=student_dashboard');
-    exit;
-}
-
 if (isset($_GET['action']) && strpos($_GET['action'], 'get') === 0) {
     require_once __DIR__ . '/controller/StudentAppointmentController.php';
     $controller = new StudentAppointmentController();
