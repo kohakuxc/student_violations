@@ -129,3 +129,34 @@ select setval(pg_get_serial_sequence('public.appointment_categories', 'category_
 select setval(pg_get_serial_sequence('public.appointment_subcategories', 'subcategory_id'),
               (select coalesce(max(subcategory_id), 1) from public.appointment_subcategories),
               true);
+
+-- Seed a local/demo officer account so officer login works in a fresh database.
+-- Change this password immediately after deployment.
+insert into public.officers (officer_id, username, name, password)
+values
+    (1, 'admin', 'Demo Officer', '$2y$10$XBF47uXCKr.3jnvrUrinpO48oi6z9/NX/dTgvdylgkVX2c/98IoYu')
+on conflict (officer_id) do update
+set username = excluded.username,
+    name = excluded.name,
+    password = excluded.password;
+
+insert into public.violation_types (violation_type_id, type_name, severity_level, is_active)
+values
+    (1, 'Uniform Violation', 'minor', true),
+    (2, 'Late Arrival / Tardiness', 'minor', true),
+    (3, 'Unauthorized Absence', 'moderate', true),
+    (4, 'Behavioral Misconduct', 'moderate', true),
+    (5, 'Bullying / Harassment', 'major', true),
+    (6, 'Disrespect Toward Staff', 'moderate', true)
+on conflict (violation_type_id) do update
+set type_name = excluded.type_name,
+    severity_level = excluded.severity_level,
+    is_active = excluded.is_active;
+
+select setval(pg_get_serial_sequence('public.officers', 'officer_id'),
+              (select coalesce(max(officer_id), 1) from public.officers),
+              true);
+
+select setval(pg_get_serial_sequence('public.violation_types', 'violation_type_id'),
+              (select coalesce(max(violation_type_id), 1) from public.violation_types),
+              true);
