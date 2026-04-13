@@ -1,40 +1,37 @@
 <?php
 /**
- * Microsoft 365 OAuth Configuration
- * Store sensitive credentials in environment variables
+ * SQL Server Database Connection
+ * Using PDO for secure, flexible connections
  */
 
-// Load .env file
-$dotenv_path = __DIR__ . '/../.env';
-if (file_exists($dotenv_path)) {
-    $env = parse_ini_file($dotenv_path);
-} else {
-    $env = $_ENV; // Fall back to system env vars (for production)
+require_once __DIR__ . '/env_loader.php';
+loadEnvFile(__DIR__ . '/.env');
+
+// Server Configuration
+$server = getenv('DB_SERVER') ?: 'localhost';
+$database = getenv('DB_DATABASE') ?: '';
+$username = getenv('DB_USERNAME') ?: '';
+$password = getenv('DB_PASSWORD') ?: '';
+
+if ($database === '' || $username === '' || $password === '') {
+    error_log('Database configuration missing: set DB_DATABASE, DB_USERNAME, DB_PASSWORD in config/.env');
+    die('Sorry, database configuration is incomplete. Please contact the administrator.');
 }
 
-// Microsoft 365 App Registration Details from .env
-define('MICROSOFT_CLIENT_ID', $env['MICROSOFT_CLIENT_ID'] ?? '');
-define('MICROSOFT_CLIENT_SECRET', $env['MICROSOFT_CLIENT_SECRET'] ?? '');
-define('MICROSOFT_REDIRECT_URI', $env['MICROSOFT_REDIRECT_URI'] ?? 'http://localhost/student_violations/index.php?page=student_oauth_callback');
-define('MICROSOFT_TENANT', 'common');
+// DSN (Data Source Name) for SQL Server
+$dsn = "sqlsrv:Server=$server;Database=$database;Encrypt=no;TrustServerCertificate=yes";
 
-// Microsoft 365 OAuth Endpoints
-define('MICROSOFT_AUTH_URL', 'https://login.microsoftonline.com/' . MICROSOFT_TENANT . '/oauth2/v2.0/authorize');
-define('MICROSOFT_TOKEN_URL', 'https://login.microsoftonline.com/' . MICROSOFT_TENANT . '/oauth2/v2.0/token');
-define('MICROSOFT_GRAPH_URL', 'https://graph.microsoft.com/v1.0/me');
+// PDO Options
+$options = [
+    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+];
 
-// Required scopes for reading user profile
-define('MICROSOFT_SCOPES', 'openid profile email');
 
-// Fairview STI allowed email domain
-define('ALLOWED_EMAIL_DOMAIN', '@fairview.sti.edu.ph');
-
-// Session configuration
-define('STUDENT_SESSION_KEY', 'student_id');
-define('STUDENT_EMAIL_KEY', 'student_email');
-define('STUDENT_NAME_KEY', 'student_name');
-
-// Security
-define('SESSION_LIFETIME', 3600); // 1 hour in seconds
-
+try {
+    $conn = new PDO($dsn, $username, $password, $options);
+}  catch (PDOException $e) {
+    error_log("Database Connection Error: " . $e->getMessage());
+    die("Sorry, we encountered a database connection error. Please try again later.");
+}
 ?>

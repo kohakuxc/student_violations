@@ -4,14 +4,14 @@
  * Store sensitive credentials in environment variables in production
  */
 
-// Load environment variables (optional, using .env file)
-// You can also hardcode these or use $_ENV
+require_once __DIR__ . '/env_loader.php';
+loadEnvFile(__DIR__ . '/.env');
 
 // Microsoft 365 App Registration Details
-define('MICROSOFT_CLIENT_ID', getenv('MICROSOFT_CLIENT_ID') ?: '');
-define('MICROSOFT_CLIENT_SECRET', getenv('MICROSOFT_CLIENT_SECRET') ?: '');
+define('MICROSOFT_CLIENT_ID', getenv('MICROSOFT_CLIENT_ID') ?: 'YOUR_CLIENT_ID_HERE');
+define('MICROSOFT_CLIENT_SECRET', getenv('MICROSOFT_CLIENT_SECRET') ?: 'YOUR_CLIENT_SECRET_HERE');
 define('MICROSOFT_REDIRECT_URI', getenv('MICROSOFT_REDIRECT_URI') ?: 'http://localhost/student_violations/index.php?page=student_oauth_callback');
-define('MICROSOFT_TENANT', '04199bc0-e2b1-480b-8826-04c0f58146f0'); // Use 'common' for multi-tenant, or specific tenant ID
+define('MICROSOFT_TENANT', getenv('MICROSOFT_TENANT') ?: 'common'); // Use 'common' for multi-tenant, or specific tenant ID
 
 // Microsoft 365 OAuth Endpoints
 define('MICROSOFT_AUTH_URL', 'https://login.microsoftonline.com/' . MICROSOFT_TENANT . '/oauth2/v2.0/authorize');

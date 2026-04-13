@@ -1,25 +1,36 @@
-# Environment variables (NEVER commit these!)
+# Environment variables and secrets
 .env
 .env.local
 .env.*.local
+config/.env
+config/.env.local
 
-# Composer
-vendor/
-composer.lock
+# Dependencies
+/vendor/
 
-# IDE
+# Runtime logs
+/logs/*.log
+/logs/*.txt
+/logs/*.json
+
+# User uploads
+/uploads/appointments/*
+!/uploads/appointments/.gitkeep
+
+# Debug/local-only scripts
+/api/debug_appointments.php
+/test_student_login.php
+
+# IDE/editor files
 .vscode/
 .idea/
 *.swp
 *.swo
 
-# OS
+# OS files
 .DS_Store
 Thumbs.db
 
-# Logs
-*.log
-
-# Cache
+# Temp/cache
 *.cache
 tmp/
