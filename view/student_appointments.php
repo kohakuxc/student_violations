@@ -228,12 +228,12 @@ function getStatusBadgeColor($status) {
                                         <th>Date &amp; Time</th>
                                         <th>Officer</th>
                                         <th>Status</th>
-                                        <th>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <?php foreach ($upcoming_appointments as $apt): ?>
-                                        <tr>
+                                        <tr style="cursor: pointer;" 
+                                            onclick="viewStudentAppointment(<?php echo (int) $apt['appointment_id']; ?>)">
                                             <td><?php echo htmlspecialchars($apt['category_name'] ?? $apt['category_id']); ?></td>
                                             <td><?php echo htmlspecialchars($apt['subcategory_name'] ?? $apt['subcategory_id']); ?></td>
                                             <td><?php echo date('M d, Y h:i A', strtotime($apt['scheduled_date'])); ?></td>
@@ -244,10 +244,6 @@ function getStatusBadgeColor($status) {
                                                 </span>
                                             </td>
                                             <td>
-                                                <button class="btn btn-sm btn-info"
-                                                        onclick="viewStudentAppointment(<?php echo (int) $apt['appointment_id']; ?>)">
-                                                    <i class="fas fa-eye"></i> View
-                                                </button>
                                                 <?php if (in_array($apt['status'], ['pending', 'approved'])): ?>
                                                     <button class="btn btn-sm btn-danger"
                                                             onclick="confirmCancel(<?php echo (int) $apt['appointment_id']; ?>)">
@@ -287,12 +283,12 @@ function getStatusBadgeColor($status) {
                                         <th>Officer</th>
                                         <th>Status</th>
                                         <th>Created</th>
-                                        <th>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <?php foreach ($all_appointments as $apt): ?>
-                                        <tr>
+                                        <tr style="cursor: pointer;" 
+                                            onclick="viewStudentAppointment(<?php echo (int) $apt['appointment_id']; ?>)">
                                             <td><?php echo htmlspecialchars($apt['category_name'] ?? $apt['category_id']); ?></td>
                                             <td><?php echo htmlspecialchars($apt['subcategory_name'] ?? $apt['subcategory_id']); ?></td>
                                             <td><?php echo date('M d, Y h:i A', strtotime($apt['scheduled_date'])); ?></td>
@@ -303,12 +299,6 @@ function getStatusBadgeColor($status) {
                                                 </span>
                                             </td>
                                             <td><?php echo date('M d, Y', strtotime($apt['created_at'])); ?></td>
-                                            <td>
-                                                <button class="btn btn-sm btn-info"
-                                                        onclick="viewStudentAppointment(<?php echo (int) $apt['appointment_id']; ?>)">
-                                                    <i class="fas fa-eye"></i> View
-                                                </button>
-                                            </td>
                                         </tr>
                                     <?php endforeach; ?>
                                 </tbody>
