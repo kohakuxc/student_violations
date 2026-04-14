@@ -81,7 +81,7 @@ function getStatusBadgeColor($status) {
                     <h5 class="mb-0"><i class="fas fa-file-alt"></i> Create New Appointment</h5>
                 </div>
                 <div class="card-body">
-                    <form id="appointmentForm" enctype="multipart/form-data">
+                    <form id="appointmentForm" action="api/create_appointment.php" method="POST" enctype="multipart/form-data">
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label for="category_id" class="form-label">
@@ -436,7 +436,7 @@ document.getElementById('appointmentForm')?.addEventListener('submit', function 
     e.preventDefault();
     const formData = new FormData(this);
 
-    fetch('api/create_appointment.php', { method: 'POST', body: formData })
+    fetch(this.action || 'api/create_appointment.php', { method: 'POST', body: formData })
         .then(r => r.json())
         .then(data => {
             if (!data.success) {
