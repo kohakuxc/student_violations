@@ -16,6 +16,8 @@ config/.env.local
 # User uploads
 /uploads/appointments/*
 !/uploads/appointments/.gitkeep
+/uploads/evidence/*
+!/uploads/evidence/.gitkeep
 
 # Debug/local-only scripts
 /test_student_login.php

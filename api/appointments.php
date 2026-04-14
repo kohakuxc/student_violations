@@ -2,17 +2,6 @@
 session_start();
 header('Content-Type: application/json');
 
-// Support test_login parameter for local testing
-if (isset($_GET['test_login'])) {
-    if ($_GET['test_login'] === 'officer') {
-        $_SESSION['officer_id'] = 1;
-        $_SESSION['name'] = 'Test Officer';
-    } elseif ($_GET['test_login'] === 'student') {
-        $_SESSION['student_id'] = 1;
-        $_SESSION['student_name'] = 'Test Student';
-    }
-}
-
 if (!isset($_SESSION['student_id']) && !isset($_SESSION['officer_id'])) {
     http_response_code(401);
     echo json_encode(['success' => false, 'message' => 'Not authenticated']);

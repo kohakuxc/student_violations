@@ -1,0 +1,17 @@
+.git
+.gitignore
+.vscode
+.vs
+.idea
+
+node_modules
+vendor
+
+logs
+uploads
+
+config/.env
+config/.env.local
+
+README.md
+docs

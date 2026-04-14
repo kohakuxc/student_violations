@@ -59,9 +59,16 @@ class AppointmentModel
     {
         try {
             $log_file = __DIR__ . '/../logs/appointments.log';
+            $isProduction = strtolower(trim(getenv('APP_ENV') ?: 'development')) === 'production';
+            $log = function ($message, $force = false) use ($log_file, $isProduction) {
+                if ($isProduction && !$force) {
+                    return;
+                }
+                file_put_contents($log_file, "[" . date('Y-m-d H:i:s') . "] " . $message . "\n", FILE_APPEND);
+            };
 
             if (!$student_id || !$category_id || !$subcategory_id || !$description || !$scheduled_datetime) {
-                file_put_contents($log_file, "[" . date('Y-m-d H:i:s') . "] MODEL ERROR: Missing required fields\n", FILE_APPEND);
+                $log('MODEL ERROR: Missing required fields', true);
                 return false;
             }
 
@@ -77,18 +84,18 @@ class AppointmentModel
                     created_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)";
 
-            file_put_contents($log_file, "[" . date('Y-m-d H:i:s') . "] SQL Query prepared\n", FILE_APPEND);
+            $log('SQL Query prepared');
 
             $stmt = $this->conn->prepare($query);
 
             if (!$stmt) {
                 $error = $this->conn->error;
-                file_put_contents($log_file, "[" . date('Y-m-d H:i:s') . "] PREPARE ERROR: $error\n", FILE_APPEND);
+                $log("PREPARE ERROR: $error", true);
                 return false;
             }
 
             $status = 'pending';
-            $officer_id = 1;
+            $officer_id = (int) (getenv('DEFAULT_OFFICER_ID') ?: 1);
             $result = $stmt->execute([
                 (int) $student_id,
                 (int) $officer_id,
@@ -102,11 +109,11 @@ class AppointmentModel
 
             if (!$result) {
                 $error_info = $stmt->errorInfo();
-                file_put_contents($log_file, "[" . date('Y-m-d H:i:s') . "] EXECUTE ERROR: " . $error_info[2] . "\n", FILE_APPEND);
+                $log("EXECUTE ERROR: " . $error_info[2], true);
                 return false;
             }
 
-            file_put_contents($log_file, "[" . date('Y-m-d H:i:s') . "] SUCCESS: Appointment created\n", FILE_APPEND);
+            $log('SUCCESS: Appointment created');
             return true;
 
         } catch (Exception $e) {

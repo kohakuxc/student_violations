@@ -2,6 +2,22 @@
 session_start();
 header('Content-Type: application/json');
 
+require_once __DIR__ . '/../config/env_loader.php';
+loadEnvFile(__DIR__ . '/../config/.env');
+
+$appEnv = strtolower(trim(getenv('APP_ENV') ?: 'development'));
+if ($appEnv !== 'development') {
+    http_response_code(404);
+    echo json_encode(['success' => false, 'message' => 'Not found']);
+    exit;
+}
+
+if (!isset($_SESSION['officer_id'])) {
+    http_response_code(401);
+    echo json_encode(['success' => false, 'message' => 'Officer authentication required']);
+    exit;
+}
+
 require_once __DIR__ . '/../config/db_connection.php';
 require_once __DIR__ . '/../model/AppointmentModel.php';
 
