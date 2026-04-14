@@ -16,6 +16,7 @@ $student_id = (int) $_SESSION['student_id'];
 $all_appointments      = $appointmentModel->getStudentAppointments($student_id);
 $upcoming_appointments = $appointmentModel->getStudentUpcomingAppointments($student_id);
 $counts                = $appointmentModel->getStudentAppointmentCounts($student_id);
+$activeTab = $_GET['tab'] ?? 'new-appointment';
 
 // Get categories for the new appointment form
 $categories = $appointmentModel->getAllCategories();
@@ -51,36 +52,38 @@ function getStatusBadgeColor($status) {
 
     <!-- Tab Navigation -->
     <div class="card mb-4">
-        <ul class="nav nav-tabs card-header-tabs" role="tablist" style="border-bottom:0;">
-            <li class="nav-item">
-                <a class="nav-link active" id="new-appointment-tab" data-bs-toggle="tab"
-                   href="#new-appointment" role="tab">
-                    <i class="fas fa-plus"></i> New Appointment
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" id="upcoming-tab" data-bs-toggle="tab" href="#upcoming" role="tab">
-                    <i class="fas fa-calendar"></i> Upcoming
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" id="history-tab" data-bs-toggle="tab" href="#history" role="tab">
-                    <i class="fas fa-history"></i> History
-                </a>
-            </li>
-        </ul>
+        <div class="card-body py-2 px-3">
+            <ul class="nav nav-tabs appointments-tabs mb-0" role="tablist">
+                <li class="nav-item">
+                    <a class="nav-link <?php echo $activeTab === 'new-appointment' ? 'active' : ''; ?>" id="new-appointment-tab" data-bs-toggle="tab"
+                       href="#new-appointment" role="tab">
+                        <i class="fas fa-plus"></i> New Appointment
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link <?php echo $activeTab === 'upcoming' ? 'active' : ''; ?>" id="upcoming-tab" data-bs-toggle="tab" href="#upcoming" role="tab">
+                        <i class="fas fa-calendar"></i> Upcoming
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link <?php echo $activeTab === 'history' ? 'active' : ''; ?>" id="history-tab" data-bs-toggle="tab" href="#history" role="tab">
+                        <i class="fas fa-history"></i> History
+                    </a>
+                </li>
+            </ul>
+        </div>
     </div>
 
     <div class="tab-content">
 
         <!-- ===== New Appointment Tab ===== -->
-        <div id="new-appointment" class="tab-pane fade show active">
+        <div id="new-appointment" class="tab-pane fade <?php echo $activeTab === 'new-appointment' ? 'show active' : ''; ?>">
             <div class="card">
                 <div class="card-header bg-primary text-white">
                     <h5 class="mb-0"><i class="fas fa-file-alt"></i> Create New Appointment</h5>
                 </div>
                 <div class="card-body">
-                    <form id="appointmentForm" enctype="multipart/form-data">
+                    <form id="appointmentForm" action="api/create_appointment.php" method="POST" enctype="multipart/form-data">
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label for="category_id" class="form-label">
@@ -156,7 +159,7 @@ function getStatusBadgeColor($status) {
         </div>
 
         <!-- ===== Upcoming Tab ===== -->
-        <div id="upcoming" class="tab-pane fade">
+        <div id="upcoming" class="tab-pane fade <?php echo $activeTab === 'upcoming' ? 'show active' : ''; ?>">
 
             <!-- Status Count Cards -->
             <?php if ($counts): ?>
@@ -222,19 +225,17 @@ function getStatusBadgeColor($status) {
                             <table class="table table-hover">
                                 <thead class="table-light">
                                     <tr>
-                                        <th>ID</th>
                                         <th>Category</th>
                                         <th>Type</th>
                                         <th>Date &amp; Time</th>
                                         <th>Officer</th>
                                         <th>Status</th>
-                                        <th>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <?php foreach ($upcoming_appointments as $apt): ?>
-                                        <tr>
-                                            <td><?php echo (int) $apt['appointment_id']; ?></td>
+                                        <tr style="cursor: pointer;" 
+                                            onclick="viewStudentAppointment(<?php echo (int) $apt['appointment_id']; ?>)">
                                             <td><?php echo htmlspecialchars($apt['category_name'] ?? $apt['category_id']); ?></td>
                                             <td><?php echo htmlspecialchars($apt['subcategory_name'] ?? $apt['subcategory_id']); ?></td>
                                             <td><?php echo date('M d, Y h:i A', strtotime($apt['scheduled_date'])); ?></td>
@@ -245,10 +246,6 @@ function getStatusBadgeColor($status) {
                                                 </span>
                                             </td>
                                             <td>
-                                                <button class="btn btn-sm btn-info"
-                                                        onclick="viewStudentAppointment(<?php echo (int) $apt['appointment_id']; ?>)">
-                                                    <i class="fas fa-eye"></i> View
-                                                </button>
                                                 <?php if (in_array($apt['status'], ['pending', 'approved'])): ?>
                                                     <button class="btn btn-sm btn-danger"
                                                             onclick="confirmCancel(<?php echo (int) $apt['appointment_id']; ?>)">
@@ -271,7 +268,7 @@ function getStatusBadgeColor($status) {
         </div>
 
         <!-- ===== History Tab ===== -->
-        <div id="history" class="tab-pane fade">
+        <div id="history" class="tab-pane fade <?php echo $activeTab === 'history' ? 'show active' : ''; ?>">
             <div class="card">
                 <div class="card-header bg-primary text-white">
                     <h5 class="mb-0"><i class="fas fa-history"></i> Appointment History</h5>
@@ -282,20 +279,18 @@ function getStatusBadgeColor($status) {
                             <table class="table table-hover">
                                 <thead class="table-light">
                                     <tr>
-                                        <th>ID</th>
                                         <th>Category</th>
                                         <th>Type</th>
                                         <th>Scheduled Date</th>
                                         <th>Officer</th>
                                         <th>Status</th>
                                         <th>Created</th>
-                                        <th>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <?php foreach ($all_appointments as $apt): ?>
-                                        <tr>
-                                            <td><?php echo (int) $apt['appointment_id']; ?></td>
+                                        <tr style="cursor: pointer;" 
+                                            onclick="viewStudentAppointment(<?php echo (int) $apt['appointment_id']; ?>)">
                                             <td><?php echo htmlspecialchars($apt['category_name'] ?? $apt['category_id']); ?></td>
                                             <td><?php echo htmlspecialchars($apt['subcategory_name'] ?? $apt['subcategory_id']); ?></td>
                                             <td><?php echo date('M d, Y h:i A', strtotime($apt['scheduled_date'])); ?></td>
@@ -306,12 +301,6 @@ function getStatusBadgeColor($status) {
                                                 </span>
                                             </td>
                                             <td><?php echo date('M d, Y', strtotime($apt['created_at'])); ?></td>
-                                            <td>
-                                                <button class="btn btn-sm btn-info"
-                                                        onclick="viewStudentAppointment(<?php echo (int) $apt['appointment_id']; ?>)">
-                                                    <i class="fas fa-eye"></i> View
-                                                </button>
-                                            </td>
                                         </tr>
                                     <?php endforeach; ?>
                                 </tbody>
@@ -434,15 +423,14 @@ document.getElementById('date')?.addEventListener('change', function () {
 document.getElementById('appointmentForm')?.addEventListener('submit', function (e) {
     e.preventDefault();
     const formData = new FormData(this);
-    formData.append('action', 'createAppointment');
 
-    fetch('index.php', { method: 'POST', body: formData })
-        .then(r => {
-            // createAppointment redirects, so handle gracefully
-            showToast('Appointment submitted successfully!', 'success');
-            this.reset();
-            document.getElementById('subcategory_id').disabled = true;
-            document.getElementById('time').disabled = true;
+    fetch(this.action || 'api/create_appointment.php', { method: 'POST', body: formData })
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success) {
+                throw new Error(data.message || 'Appointment submission failed');
+            }
+            window.location.href = 'index.php?page=student_appointments&tab=history';
         })
         .catch(() => showToast('Error submitting appointment.', 'danger'));
 });

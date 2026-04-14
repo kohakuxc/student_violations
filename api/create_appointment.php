@@ -2,6 +2,11 @@
 session_start();
 header('Content-Type: application/json');
 
+require_once __DIR__ . '/../config/env_loader.php';
+loadEnvFile(__DIR__ . '/../config/.env');
+
+$isProduction = strtolower(trim(getenv('APP_ENV') ?: 'development')) === 'production';
+
 // Create custom log file
 $log_dir = __DIR__ . '/../logs';
 if (!is_dir($log_dir)) {
@@ -10,8 +15,11 @@ if (!is_dir($log_dir)) {
 $log_file = $log_dir . '/appointments.log';
 
 // Function to log messages
-function debug_log($message) {
-    global $log_file;
+function debug_log($message, $force = false) {
+    global $log_file, $isProduction;
+    if ($isProduction && !$force) {
+        return;
+    }
     $timestamp = date('Y-m-d H:i:s');
     file_put_contents($log_file, "[$timestamp] $message\n", FILE_APPEND);
 }
@@ -21,7 +29,7 @@ debug_log("Student ID: " . ($_SESSION['student_id'] ?? 'NOT SET'));
 debug_log("POST Data: " . json_encode($_POST));
 
 if (!isset($_SESSION['student_id'])) {
-    debug_log("ERROR: Not authenticated");
+    debug_log("ERROR: Not authenticated", true);
     http_response_code(401);
     echo json_encode(['success' => false, 'message' => 'Not authenticated']);
     exit;
@@ -42,12 +50,12 @@ try {
     debug_log("Form Data - Cat: $category_id, SubCat: $subcategory_id, Date: $date, Time: $time");
     
     if (!$category_id || !$subcategory_id || !$description || !$date || !$time) {
-        debug_log("ERROR: Missing required fields");
+        debug_log("ERROR: Missing required fields", true);
         throw new Exception('All fields are required');
     }
     
     if (strlen($description) > 1000) {
-        debug_log("ERROR: Description too long");
+        debug_log("ERROR: Description too long", true);
         throw new Exception('Description cannot exceed 1000 characters');
     }
     
@@ -59,12 +67,12 @@ try {
         $max_size = 3 * 1024 * 1024;
         
         if (!in_array($file['type'], $allowed_types)) {
-            debug_log("ERROR: Invalid file type - {$file['type']}");
+            debug_log("ERROR: Invalid file type - {$file['type']}", true);
             throw new Exception('Invalid file type. Only PDF and JPG allowed');
         }
         
         if ($file['size'] > $max_size) {
-            debug_log("ERROR: File too large - {$file['size']} bytes");
+            debug_log("ERROR: File too large - {$file['size']} bytes", true);
             throw new Exception('File size exceeds 3MB limit');
         }
         
@@ -79,7 +87,7 @@ try {
         $file_path = $uploads_dir . $file_name;
         
         if (!move_uploaded_file($file['tmp_name'], $file_path)) {
-            debug_log("ERROR: Failed to move uploaded file");
+            debug_log("ERROR: Failed to move uploaded file", true);
             throw new Exception('Failed to upload file');
         }
         
@@ -117,7 +125,7 @@ try {
     ]);
     
 } catch (Exception $e) {
-    debug_log("EXCEPTION: " . $e->getMessage());
+    debug_log("EXCEPTION: " . $e->getMessage(), true);
     http_response_code(400);
     echo json_encode([
         'success' => false,

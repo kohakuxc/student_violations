@@ -148,7 +148,6 @@ class StudentAppointmentController
             // Create appointment
             $appointment_id = $this->appointmentModel->createAppointment(
                 $student_id,
-                $officer_id,
                 $category_id,
                 $subcategory_id,
                 $description,

@@ -112,9 +112,9 @@ function getStatusBadgeColor($status) {
                         <option value="cancelled"   <?php echo ($status === 'cancelled')   ? 'selected' : ''; ?>>Cancelled</option>
                     </select>
                 </div>
-                <div class="col-md-2 d-flex gap-1">
-                    <button type="submit" class="btn btn-primary flex-fill">Filter</button>
-                    <a href="index.php?page=officer_appointments" class="btn btn-secondary">Reset</a>
+                <div class="col-md-2 d-flex gap-1 align-items-stretch">
+                    <button type="submit" class="btn btn-primary flex-fill h-100">Filter</button>
+                    <a href="index.php?page=officer_appointments" class="btn btn-secondary flex-fill h-100 d-flex align-items-center justify-content-center">Reset</a>
                 </div>
             </form>
 
