@@ -52,24 +52,26 @@ function getStatusBadgeColor($status) {
 
     <!-- Tab Navigation -->
     <div class="card mb-4">
-        <ul class="nav nav-tabs card-header-tabs" role="tablist" style="border-bottom:0;">
-            <li class="nav-item">
-                <a class="nav-link <?php echo $activeTab === 'new-appointment' ? 'active' : ''; ?>" id="new-appointment-tab" data-bs-toggle="tab"
-                   href="#new-appointment" role="tab">
-                    <i class="fas fa-plus"></i> New Appointment
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link <?php echo $activeTab === 'upcoming' ? 'active' : ''; ?>" id="upcoming-tab" data-bs-toggle="tab" href="#upcoming" role="tab">
-                    <i class="fas fa-calendar"></i> Upcoming
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link <?php echo $activeTab === 'history' ? 'active' : ''; ?>" id="history-tab" data-bs-toggle="tab" href="#history" role="tab">
-                    <i class="fas fa-history"></i> History
-                </a>
-            </li>
-        </ul>
+        <div class="card-body py-2 px-3">
+            <ul class="nav nav-tabs appointments-tabs mb-0" role="tablist">
+                <li class="nav-item">
+                    <a class="nav-link <?php echo $activeTab === 'new-appointment' ? 'active' : ''; ?>" id="new-appointment-tab" data-bs-toggle="tab"
+                       href="#new-appointment" role="tab">
+                        <i class="fas fa-plus"></i> New Appointment
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link <?php echo $activeTab === 'upcoming' ? 'active' : ''; ?>" id="upcoming-tab" data-bs-toggle="tab" href="#upcoming" role="tab">
+                        <i class="fas fa-calendar"></i> Upcoming
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link <?php echo $activeTab === 'history' ? 'active' : ''; ?>" id="history-tab" data-bs-toggle="tab" href="#history" role="tab">
+                        <i class="fas fa-history"></i> History
+                    </a>
+                </li>
+            </ul>
+        </div>
     </div>
 
     <div class="tab-content">

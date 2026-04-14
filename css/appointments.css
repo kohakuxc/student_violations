@@ -38,21 +38,72 @@
 
 .nav-tabs .nav-link {
     color: #495057;
-    border: none;
-    border-bottom: 3px solid transparent;
+    border: 0 !important;
+    border-bottom: 3px solid transparent !important;
+    background: transparent !important;
+    border-radius: 0 !important;
     transition: all 0.3s ease;
     font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    min-height: 40px;
+    line-height: 1;
+    padding: 0.65rem 1rem;
+}
+
+.nav-tabs .nav-link i {
+    line-height: 1;
+    font-size: 0.95rem;
 }
 
 .nav-tabs .nav-link:hover {
     color: #0d6efd;
     border-bottom-color: #0d6efd;
+    background: transparent !important;
+    box-shadow: none !important;
 }
 
 .nav-tabs .nav-link.active {
     color: #0d6efd;
-    background-color: transparent;
-    border-bottom-color: #0d6efd;
+    background: transparent !important;
+    border: 0 !important;
+    border-bottom: 3px solid #0d6efd !important;
+    box-shadow: none !important;
+}
+
+/* Student appointment tabs: clean underline style + balanced spacing */
+.appointments-tabs {
+    display: flex;
+    gap: 0.35rem;
+    align-items: stretch;
+}
+
+.appointments-tabs .nav-item {
+    margin-bottom: 0;
+}
+
+.appointments-tabs .nav-link {
+    border: 0 !important;
+    border-bottom: 3px solid transparent !important;
+    background: transparent !important;
+    border-radius: 0 !important;
+    min-height: 42px;
+    padding: 0.65rem 0.95rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+}
+
+.appointments-tabs .nav-link i {
+    width: 14px;
+    text-align: center;
+}
+
+.appointments-tabs .nav-link:focus,
+.appointments-tabs .nav-link:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
 }
 
 /* Form Styling */
