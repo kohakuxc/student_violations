@@ -133,7 +133,8 @@ class AppointmentModel
             $stmt = $this->conn->prepare("
             SELECT COUNT(*) as count 
             FROM appointments 
-            WHERE CAST(scheduled_date AS DATE) = ?
+                        WHERE CAST(scheduled_date AS DATE) = ?
+                            AND status IN ('pending', 'approved', 'in_progress', 'rescheduled')
         ");
             $stmt->execute([$today]);
             $row = $stmt->fetch(PDO::FETCH_ASSOC);
