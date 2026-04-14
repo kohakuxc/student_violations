@@ -75,7 +75,7 @@ class AppointmentModel
                     evidence_image,
                     status,
                     created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)";
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)";
 
             file_put_contents($log_file, "[" . date('Y-m-d H:i:s') . "] SQL Query prepared\n", FILE_APPEND);
 
