@@ -223,7 +223,6 @@ function getStatusBadgeColor($status) {
                             <table class="table table-hover">
                                 <thead class="table-light">
                                     <tr>
-                                        <th>ID</th>
                                         <th>Category</th>
                                         <th>Type</th>
                                         <th>Date &amp; Time</th>
@@ -235,7 +234,6 @@ function getStatusBadgeColor($status) {
                                 <tbody>
                                     <?php foreach ($upcoming_appointments as $apt): ?>
                                         <tr>
-                                            <td><?php echo (int) $apt['appointment_id']; ?></td>
                                             <td><?php echo htmlspecialchars($apt['category_name'] ?? $apt['category_id']); ?></td>
                                             <td><?php echo htmlspecialchars($apt['subcategory_name'] ?? $apt['subcategory_id']); ?></td>
                                             <td><?php echo date('M d, Y h:i A', strtotime($apt['scheduled_date'])); ?></td>
@@ -283,7 +281,6 @@ function getStatusBadgeColor($status) {
                             <table class="table table-hover">
                                 <thead class="table-light">
                                     <tr>
-                                        <th>ID</th>
                                         <th>Category</th>
                                         <th>Type</th>
                                         <th>Scheduled Date</th>
@@ -296,7 +293,6 @@ function getStatusBadgeColor($status) {
                                 <tbody>
                                     <?php foreach ($all_appointments as $apt): ?>
                                         <tr>
-                                            <td><?php echo (int) $apt['appointment_id']; ?></td>
                                             <td><?php echo htmlspecialchars($apt['category_name'] ?? $apt['category_id']); ?></td>
                                             <td><?php echo htmlspecialchars($apt['subcategory_name'] ?? $apt['subcategory_id']); ?></td>
                                             <td><?php echo date('M d, Y h:i A', strtotime($apt['scheduled_date'])); ?></td>
