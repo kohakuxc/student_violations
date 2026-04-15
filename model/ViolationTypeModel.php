@@ -19,7 +19,7 @@ class ViolationTypeModel
         try {
             $query = "SELECT violation_type_id, type_name, severity_level
                       FROM violation_types
-                      WHERE is_active = 1
+                      WHERE is_active = true
                       ORDER BY severity_level, type_name";
             $stmt = $this->conn->prepare($query);
             $stmt->execute();
