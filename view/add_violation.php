@@ -29,7 +29,7 @@
         <?php foreach (($violation_types ?? []) as $t): ?>
           <option value="<?php echo htmlspecialchars($t['violation_type_id']); ?>"
             <?php echo ($violation_type ?? '') == $t['violation_type_id'] ? 'selected' : ''; ?>>
-            <?php echo htmlspecialchars(ucfirst($t['severity_level'])); ?>
+            <?php echo htmlspecialchars($t['type_name']); ?>
           </option>
         <?php endforeach; ?>
       </select>
