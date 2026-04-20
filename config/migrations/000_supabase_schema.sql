@@ -152,12 +152,11 @@ set username = excluded.username,
 
 insert into public.violation_types (violation_type_id, type_name, severity_level, is_active)
 values
-    (1, 'Uniform Violation', 'minor', true),
-    (2, 'Late Arrival / Tardiness', 'minor', true),
-    (3, 'Unauthorized Absence', 'moderate', true),
-    (4, 'Behavioral Misconduct', 'moderate', true),
-    (5, 'Bullying / Harassment', 'major', true),
-    (6, 'Disrespect Toward Staff', 'moderate', true)
+    (1, 'Minor Offense', 'minor', true),
+    (2, 'Major Offense - Category A', 'major', true),
+    (3, 'Major Offense - Category B', 'major', true),
+    (4, 'Major Offense - Category C', 'major', true),
+    (5, 'Major Offense - Category D', 'major', true)
 on conflict (violation_type_id) do update
 set type_name = excluded.type_name,
     severity_level = excluded.severity_level,

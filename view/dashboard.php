@@ -56,8 +56,9 @@ include 'view/partials/layout_top.php'; ?>
   }
 
   .donut-wrap canvas {
-    width: 280px !important;
-    height: 280px !important;
+    width: min(280px, 100%) !important;
+    height: auto !important;
+    aspect-ratio: 1 / 1;
     display: block;
   }
 
@@ -97,11 +98,15 @@ include 'view/partials/layout_top.php'; ?>
   /* Monthly report filter */
   .month-filter {
     display: grid;
-    grid-template-columns: auto 1fr auto;
-    /* label | calendar | button */
+    grid-template-columns: auto minmax(140px, 1fr) auto minmax(140px, 1fr) auto;
     gap: 10px;
     align-items: center;
     margin: 12px 0 10px;
+  }
+
+  .month-filter label {
+    margin: 0;
+    white-space: nowrap;
   }
 
   .month-filter input[type="month"] {
@@ -130,6 +135,21 @@ include 'view/partials/layout_top.php'; ?>
     .chart-wrap,
     .donut-wrap {
       height: 260px;
+    }
+  }
+
+  @media (max-width: 760px) {
+    .month-filter {
+      grid-template-columns: 1fr;
+      gap: 8px;
+    }
+
+    .month-filter button {
+      width: 100%;
+    }
+
+    .donut-wrap {
+      height: 240px;
     }
   }
 
@@ -230,13 +250,17 @@ include 'view/partials/layout_top.php'; ?>
   <div class="dash-card card-mid">
     <h3>Monthly Report</h3>
     <p class="dash-muted">
-      Students grouped by highest violation severity in the selected month (includes students with no violations).
+      Students grouped by highest violation severity from <strong><?php echo date('F Y', strtotime($from_month)); ?></strong> to <strong><?php echo date('F Y', strtotime($to_month)); ?></strong> (includes students with no violations).
     </p>
 
     <form class="month-filter" method="GET" action="index.php">
       <input type="hidden" name="page" value="dashboard">
-      <label for="month"><b>Month:</b></label>
-      <input type="month" id="month" name="month" value="<?php echo htmlspecialchars($selected_month); ?>">
+      <label for="from_month"><b>From:</b></label>
+      <input type="month" id="from_month" name="from_month" value="<?php echo htmlspecialchars($from_month ?? date('Y-m', strtotime('first day of -3 months'))); ?>">
+
+      <label for="to_month"><b>To:</b></label>
+      <input type="month" id="to_month" name="to_month" value="<?php echo htmlspecialchars($to_month ?? date('Y-m')); ?>">
+
       <button type="submit" class="btn btn-primary btn-small">Apply</button>
     </form>
 
@@ -254,7 +278,6 @@ include 'view/partials/layout_top.php'; ?>
   (function () {
     const COLOR_NONE = '#3B82F6';
     const COLOR_MINOR = '#A78BFA';
-    const COLOR_MODERATE = '#F59E0B';
     const COLOR_MAJOR = '#EF4444';
 
     // Yearly overview data from PHP
@@ -262,7 +285,6 @@ include 'view/partials/layout_top.php'; ?>
       'labels' => ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
       'none' => array_fill(0, 12, 0),
       'minor' => array_fill(0, 12, 0),
-      'moderate' => array_fill(0, 12, 0),
       'major' => array_fill(0, 12, 0),
     ]); ?>;
 
@@ -286,15 +308,6 @@ include 'view/partials/layout_top.php'; ?>
             data: yearly.minor,
             borderColor: COLOR_MINOR,
             backgroundColor: 'rgba(167,139,250,0.12)',
-            fill: true,
-            tension: 0.35,
-            pointRadius: 3
-          },
-          {
-            label: 'Moderate',
-            data: yearly.moderate,
-            borderColor: COLOR_MODERATE,
-            backgroundColor: 'rgba(245,158,11,0.12)',
             fill: true,
             tension: 0.35,
             pointRadius: 3
@@ -328,8 +341,8 @@ include 'view/partials/layout_top.php'; ?>
     });
 
     // Donut chart: Total Violations (Overall)
-    const overall = <?php echo json_encode($overallViolationCounts ?? ['minor' => 0, 'moderate' => 0, 'major' => 0]); ?>;
-    const donutData = [overall.minor, overall.moderate, overall.major];
+    const overall = <?php echo json_encode($overallViolationCounts ?? ['minor' => 0, 'major' => 0]); ?>;
+    const donutData = [overall.minor, overall.major];
     const total = donutData.reduce((a, b) => a + b, 0);
 
     var totalEl = document.getElementById('donutTotalValue');
@@ -338,10 +351,10 @@ include 'view/partials/layout_top.php'; ?>
     new Chart(document.getElementById('overallDonutChart'), {
       type: 'doughnut',
       data: {
-        labels: ['Minor', 'Moderate', 'Major'],
+        labels: ['Minor Offense', 'Major Offense'],
         datasets: [{
           data: donutData,
-          backgroundColor: [COLOR_MINOR, COLOR_MODERATE, COLOR_MAJOR],
+          backgroundColor: [COLOR_MINOR, COLOR_MAJOR],
           borderWidth: 0
         }]
       },
@@ -349,25 +362,86 @@ include 'view/partials/layout_top.php'; ?>
         responsive: true,
         maintainAspectRatio: true,
         cutout: '60%',
+        interaction: {
+          mode: 'index',
+          intersect: false
+        },
         plugins: {
           legend: { position: 'bottom' },
-          tooltip: { enabled: true },
+          tooltip: {
+            enabled: false,
+            external: function(context) {
+              let tooltipEl = document.getElementById('chartTooltip');
+              
+              if (!tooltipEl) {
+                tooltipEl = document.createElement('div');
+                tooltipEl.id = 'chartTooltip';
+                tooltipEl.style.background = 'rgba(0, 0, 0, 0.85)';
+                tooltipEl.style.color = '#fff';
+                tooltipEl.style.borderRadius = '6px';
+                tooltipEl.style.padding = '10px 12px';
+                tooltipEl.style.fontSize = '13px';
+                tooltipEl.style.pointerEvents = 'none';
+                tooltipEl.style.transform = 'translate(-50%, 0)';
+                tooltipEl.style.transition = 'all 0.1s ease';
+                tooltipEl.style.border = '1px solid #666';
+                tooltipEl.style.zIndex = '9999';
+                document.body.appendChild(tooltipEl);
+              }
+              
+              const tooltip = context.tooltip;
+              if (tooltip.opacity === 0) {
+                tooltipEl.style.opacity = '0';
+                tooltipEl.style.pointerEvents = 'none';
+                return;
+              }
+              
+              if (tooltip.body) {
+                const titleLines = tooltip.title || [];
+                const bodyLines = tooltip.body.map(b => b.lines);
+                
+                let innerHtml = '';
+                titleLines.forEach(title => {
+                  innerHtml += '<strong style="display:block; margin-bottom:4px;">' + title + '</strong>';
+                });
+                
+                bodyLines.forEach((line, index) => {
+                  const color = tooltip.labelColors[index];
+                  const colorBox = '<span style="display:inline-block; width:12px; height:12px; background:' + color.backgroundColor + '; border-radius:2px; margin-right:8px; vertical-align:middle;"></span>';
+                  innerHtml += colorBox + line.join(' ');
+                });
+                
+                tooltipEl.innerHTML = innerHtml;
+              }
+              
+              const canvas = context.chart.canvas;
+              const chartRect = canvas.getBoundingClientRect();
+              const posX = chartRect.left + window.pageXOffset + tooltip.caretX;
+              const posY = chartRect.top + window.pageYOffset + tooltip.caretY - 40;
+              
+              tooltipEl.style.opacity = '1';
+              tooltipEl.style.position = 'absolute';
+              tooltipEl.style.left = posX + 'px';
+              tooltipEl.style.top = posY + 'px';
+              tooltipEl.style.pointerEvents = 'auto';
+            }
+          },
           title: { display: false }
         }
       }
     });
 
     // Monthly report bar chart
-    const monthly = <?php echo json_encode($monthlyStudentCounts ?? ['none' => 0, 'minor' => 0, 'moderate' => 0, 'major' => 0]); ?>;
+    const monthly = <?php echo json_encode($monthlyStudentCounts ?? ['none' => 0, 'minor' => 0, 'major' => 0]); ?>;
 
     new Chart(document.getElementById('monthlyBarChart'), {
       type: 'bar',
       data: {
-        labels: ['No Violation', 'Minor', 'Moderate', 'Major'],
+        labels: ['No Violation', 'Minor Offense', 'Major Offense'],
         datasets: [{
           label: 'Students',
-          data: [monthly.none, monthly.minor, monthly.moderate, monthly.major],
-          backgroundColor: [COLOR_NONE, COLOR_MINOR, COLOR_MODERATE, COLOR_MAJOR],
+          data: [monthly.none, monthly.minor, monthly.major],
+          backgroundColor: [COLOR_NONE, COLOR_MINOR, COLOR_MAJOR],
           borderRadius: 8
         }]
       },

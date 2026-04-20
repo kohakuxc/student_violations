@@ -20,7 +20,7 @@ class ViolationTypeModel
             $query = "SELECT violation_type_id, type_name, severity_level
                       FROM violation_types
                       WHERE is_active = true
-                      ORDER BY severity_level, type_name";
+                      ORDER BY violation_type_id ASC";
             $stmt = $this->conn->prepare($query);
             $stmt->execute();
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
