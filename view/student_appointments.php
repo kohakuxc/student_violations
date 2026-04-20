@@ -13,22 +13,23 @@ $appointmentModel = new AppointmentModel();
 $student_id = (int) $_SESSION['student_id'];
 
 // Get all appointments and status counts for this student
-$all_appointments      = $appointmentModel->getStudentAppointments($student_id);
+$all_appointments = $appointmentModel->getStudentAppointments($student_id);
 $upcoming_appointments = $appointmentModel->getStudentUpcomingAppointments($student_id);
-$counts                = $appointmentModel->getStudentAppointmentCounts($student_id);
+$counts = $appointmentModel->getStudentAppointmentCounts($student_id);
 $activeTab = $_GET['tab'] ?? 'new-appointment';
 
 // Get categories for the new appointment form
 $categories = $appointmentModel->getAllCategories();
 
-function getStatusBadgeColor($status) {
+function getStatusBadgeColor($status)
+{
     $colors = [
-        'pending'     => 'warning',
-        'approved'    => 'info',
+        'pending' => 'warning',
+        'approved' => 'info',
         'in_progress' => 'primary',
-        'completed'   => 'success',
-        'rejected'    => 'danger',
-        'cancelled'   => 'secondary',
+        'completed' => 'success',
+        'rejected' => 'danger',
+        'cancelled' => 'secondary',
         'rescheduled' => 'info',
     ];
     return $colors[$status] ?? 'secondary';
@@ -39,13 +40,15 @@ function getStatusBadgeColor($status) {
     <!-- Flash messages -->
     <?php if (isset($_SESSION['success'])): ?>
         <div class="alert alert-success alert-dismissible fade show" role="alert">
-            <?php echo htmlspecialchars($_SESSION['success']); unset($_SESSION['success']); ?>
+            <?php echo htmlspecialchars($_SESSION['success']);
+            unset($_SESSION['success']); ?>
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
     <?php endif; ?>
     <?php if (isset($_SESSION['error'])): ?>
         <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            <?php echo htmlspecialchars($_SESSION['error']); unset($_SESSION['error']); ?>
+            <?php echo htmlspecialchars($_SESSION['error']);
+            unset($_SESSION['error']); ?>
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
     <?php endif; ?>
@@ -55,18 +58,20 @@ function getStatusBadgeColor($status) {
         <div class="card-body py-2 px-3">
             <ul class="nav nav-tabs appointments-tabs mb-0" role="tablist">
                 <li class="nav-item">
-                    <a class="nav-link <?php echo $activeTab === 'new-appointment' ? 'active' : ''; ?>" id="new-appointment-tab" data-bs-toggle="tab"
-                       href="#new-appointment" role="tab">
+                    <a class="nav-link <?php echo $activeTab === 'new-appointment' ? 'active' : ''; ?>"
+                        id="new-appointment-tab" data-bs-toggle="tab" href="#new-appointment" role="tab">
                         <i class="fas fa-plus"></i> New Appointment
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link <?php echo $activeTab === 'upcoming' ? 'active' : ''; ?>" id="upcoming-tab" data-bs-toggle="tab" href="#upcoming" role="tab">
+                    <a class="nav-link <?php echo $activeTab === 'upcoming' ? 'active' : ''; ?>" id="upcoming-tab"
+                        data-bs-toggle="tab" href="#upcoming" role="tab">
                         <i class="fas fa-calendar"></i> Upcoming
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link <?php echo $activeTab === 'history' ? 'active' : ''; ?>" id="history-tab" data-bs-toggle="tab" href="#history" role="tab">
+                    <a class="nav-link <?php echo $activeTab === 'history' ? 'active' : ''; ?>" id="history-tab"
+                        data-bs-toggle="tab" href="#history" role="tab">
                         <i class="fas fa-history"></i> History
                     </a>
                 </li>
@@ -77,13 +82,15 @@ function getStatusBadgeColor($status) {
     <div class="tab-content">
 
         <!-- ===== New Appointment Tab ===== -->
-        <div id="new-appointment" class="tab-pane fade <?php echo $activeTab === 'new-appointment' ? 'show active' : ''; ?>">
+        <div id="new-appointment"
+            class="tab-pane fade <?php echo $activeTab === 'new-appointment' ? 'show active' : ''; ?>">
             <div class="card">
                 <div class="card-header text-white">
                     <h5 class="mb-0"><i class="fas fa-file-alt"></i> Create New Appointment</h5>
                 </div>
                 <div class="card-body">
-                    <form id="appointmentForm" action="api/create_appointment.php" method="POST" enctype="multipart/form-data">
+                    <form id="appointmentForm" action="api/create_appointment.php" method="POST"
+                        enctype="multipart/form-data">
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label for="category_id" class="form-label">
@@ -113,8 +120,8 @@ function getStatusBadgeColor($status) {
                                 Description <span class="text-danger">*</span>
                             </label>
                             <textarea class="form-control" id="description" name="description" rows="4"
-                                placeholder="Please describe the details of your appointment request..."
-                                required maxlength="1000"></textarea>
+                                placeholder="Please describe the details of your appointment request..." required
+                                maxlength="1000"></textarea>
                             <small class="form-text text-muted">Maximum 1000 characters</small>
                         </div>
 
@@ -163,60 +170,60 @@ function getStatusBadgeColor($status) {
 
             <!-- Status Count Cards -->
             <?php if ($counts): ?>
-            <div class="row mb-3">
-                <div class="col-md-2 mb-2">
-                    <div class="card text-center bg-warning text-white">
-                        <div class="card-body py-2">
-                            <h5><?php echo (int)($counts['pending_count'] ?? 0); ?></h5>
-                            <p class="mb-0 small">Pending</p>
+                <div class="row mb-3">
+                    <div class="col-md-2 mb-2">
+                        <div class="card text-center bg-warning text-white">
+                            <div class="card-body py-2">
+                                <h5><?php echo (int) ($counts['pending_count'] ?? 0); ?></h5>
+                                <p class="mb-0 small">Pending</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-2 mb-2">
+                        <div class="card text-center bg-info text-white">
+                            <div class="card-body py-2">
+                                <h5><?php echo (int) ($counts['approved_count'] ?? 0); ?></h5>
+                                <p class="mb-0 small">Approved</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-2 mb-2">
+                        <div class="card text-center bg-primary text-white">
+                            <div class="card-body py-2">
+                                <h5><?php echo (int) ($counts['in_progress_count'] ?? 0); ?></h5>
+                                <p class="mb-0 small">In Progress</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-2 mb-2">
+                        <div class="card text-center bg-success text-white">
+                            <div class="card-body py-2">
+                                <h5><?php echo (int) ($counts['completed_count'] ?? 0); ?></h5>
+                                <p class="mb-0 small">Completed</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-2 mb-2">
+                        <div class="card text-center bg-danger text-white">
+                            <div class="card-body py-2">
+                                <h5><?php echo (int) ($counts['rejected_count'] ?? 0); ?></h5>
+                                <p class="mb-0 small">Rejected</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-2 mb-2">
+                        <div class="card text-center bg-secondary text-white">
+                            <div class="card-body py-2">
+                                <h5><?php echo (int) ($counts['cancelled_count'] ?? 0); ?></h5>
+                                <p class="mb-0 small">Cancelled</p>
+                            </div>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-2 mb-2">
-                    <div class="card text-center bg-info text-white">
-                        <div class="card-body py-2">
-                            <h5><?php echo (int)($counts['approved_count'] ?? 0); ?></h5>
-                            <p class="mb-0 small">Approved</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-2 mb-2">
-                    <div class="card text-center bg-primary text-white">
-                        <div class="card-body py-2">
-                            <h5><?php echo (int)($counts['in_progress_count'] ?? 0); ?></h5>
-                            <p class="mb-0 small">In Progress</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-2 mb-2">
-                    <div class="card text-center bg-success text-white">
-                        <div class="card-body py-2">
-                            <h5><?php echo (int)($counts['completed_count'] ?? 0); ?></h5>
-                            <p class="mb-0 small">Completed</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-2 mb-2">
-                    <div class="card text-center bg-danger text-white">
-                        <div class="card-body py-2">
-                            <h5><?php echo (int)($counts['rejected_count'] ?? 0); ?></h5>
-                            <p class="mb-0 small">Rejected</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-2 mb-2">
-                    <div class="card text-center bg-secondary text-white">
-                        <div class="card-body py-2">
-                            <h5><?php echo (int)($counts['cancelled_count'] ?? 0); ?></h5>
-                            <p class="mb-0 small">Cancelled</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
             <?php endif; ?>
 
             <div class="card">
-                <div class="card-header bg-primary text-white">
+                <div class="card-header text-white">
                     <h5 class="mb-0"><i class="fas fa-calendar-check"></i> Upcoming Appointments</h5>
                 </div>
                 <div class="card-body">
@@ -234,10 +241,12 @@ function getStatusBadgeColor($status) {
                                 </thead>
                                 <tbody>
                                     <?php foreach ($upcoming_appointments as $apt): ?>
-                                        <tr style="cursor: pointer;" 
+                                        <tr style="cursor: pointer;"
                                             onclick="viewStudentAppointment(<?php echo (int) $apt['appointment_id']; ?>)">
-                                            <td><?php echo htmlspecialchars($apt['category_name'] ?? $apt['category_id']); ?></td>
-                                            <td><?php echo htmlspecialchars($apt['subcategory_name'] ?? $apt['subcategory_id']); ?></td>
+                                            <td><?php echo htmlspecialchars($apt['category_name'] ?? $apt['category_id']); ?>
+                                            </td>
+                                            <td><?php echo htmlspecialchars($apt['subcategory_name'] ?? $apt['subcategory_id']); ?>
+                                            </td>
                                             <td><?php echo date('M d, Y h:i A', strtotime($apt['scheduled_date'])); ?></td>
                                             <td><?php echo htmlspecialchars($apt['officer_name'] ?? '—'); ?></td>
                                             <td>
@@ -248,7 +257,7 @@ function getStatusBadgeColor($status) {
                                             <td>
                                                 <?php if (in_array($apt['status'], ['pending', 'approved'])): ?>
                                                     <button class="btn btn-sm btn-danger"
-                                                            onclick="confirmCancel(<?php echo (int) $apt['appointment_id']; ?>)">
+                                                        onclick="confirmCancel(<?php echo (int) $apt['appointment_id']; ?>)">
                                                         <i class="fas fa-ban"></i> Cancel
                                                     </button>
                                                 <?php endif; ?>
@@ -289,10 +298,12 @@ function getStatusBadgeColor($status) {
                                 </thead>
                                 <tbody>
                                     <?php foreach ($all_appointments as $apt): ?>
-                                        <tr style="cursor: pointer;" 
+                                        <tr style="cursor: pointer;"
                                             onclick="viewStudentAppointment(<?php echo (int) $apt['appointment_id']; ?>)">
-                                            <td><?php echo htmlspecialchars($apt['category_name'] ?? $apt['category_id']); ?></td>
-                                            <td><?php echo htmlspecialchars($apt['subcategory_name'] ?? $apt['subcategory_id']); ?></td>
+                                            <td><?php echo htmlspecialchars($apt['category_name'] ?? $apt['category_id']); ?>
+                                            </td>
+                                            <td><?php echo htmlspecialchars($apt['subcategory_name'] ?? $apt['subcategory_id']); ?>
+                                            </td>
                                             <td><?php echo date('M d, Y h:i A', strtotime($apt['scheduled_date'])); ?></td>
                                             <td><?php echo htmlspecialchars($apt['officer_name'] ?? '—'); ?></td>
                                             <td>
@@ -354,7 +365,7 @@ function getStatusBadgeColor($status) {
                 <div class="mb-3">
                     <label for="cancelReason" class="form-label">Reason <span class="text-danger">*</span></label>
                     <textarea class="form-control" id="cancelReason" rows="3" required
-                              placeholder="Please provide a reason for cancellation..."></textarea>
+                        placeholder="Please provide a reason for cancellation..."></textarea>
                 </div>
             </div>
             <div class="modal-footer">
@@ -372,89 +383,89 @@ function getStatusBadgeColor($status) {
 <script src="assets/js/sidebar.js"></script>
 
 <script>
-// --- Load subcategories when category changes ---
-document.getElementById('category_id')?.addEventListener('change', function () {
-    const catId = this.value;
-    const sub = document.getElementById('subcategory_id');
-    sub.innerHTML = '<option value="">Loading...</option>';
-    sub.disabled = true;
+    // --- Load subcategories when category changes ---
+    document.getElementById('category_id')?.addEventListener('change', function () {
+        const catId = this.value;
+        const sub = document.getElementById('subcategory_id');
+        sub.innerHTML = '<option value="">Loading...</option>';
+        sub.disabled = true;
 
-    if (!catId) { sub.innerHTML = '<option value="">-- Select Type --</option>'; return; }
+        if (!catId) { sub.innerHTML = '<option value="">-- Select Type --</option>'; return; }
 
-    fetch('api/appointments.php?action=getSubcategories&category_id=' + catId)
-        .then(r => r.json())
-        .then(data => {
-            sub.innerHTML = '<option value="">-- Select Type --</option>';
-            if (data.success) {
-                data.data.forEach(s => {
-                    sub.innerHTML += `<option value="${s.subcategory_id}">${s.subcategory_name}</option>`;
-                });
-                sub.disabled = false;
-            }
-        });
-});
+        fetch('api/appointments.php?action=getSubcategories&category_id=' + catId)
+            .then(r => r.json())
+            .then(data => {
+                sub.innerHTML = '<option value="">-- Select Type --</option>';
+                if (data.success) {
+                    data.data.forEach(s => {
+                        sub.innerHTML += `<option value="${s.subcategory_id}">${s.subcategory_name}</option>`;
+                    });
+                    sub.disabled = false;
+                }
+            });
+    });
 
-// --- Load time slots when date changes ---
-document.getElementById('date')?.addEventListener('change', function () {
-    const date = this.value;
-    const timeEl = document.getElementById('time');
-    timeEl.innerHTML = '<option value="">Loading...</option>';
-    timeEl.disabled = true;
+    // --- Load time slots when date changes ---
+    document.getElementById('date')?.addEventListener('change', function () {
+        const date = this.value;
+        const timeEl = document.getElementById('time');
+        timeEl.innerHTML = '<option value="">Loading...</option>';
+        timeEl.disabled = true;
 
-    if (!date) return;
+        if (!date) return;
 
-    fetch('api/appointments.php?action=getAvailableSlots&date=' + date)
-        .then(r => r.json())
-        .then(data => {
-            timeEl.innerHTML = '<option value="">-- Select Time --</option>';
-            if (data.success && data.data.length > 0) {
-                data.data.forEach(slot => {
-                    const val = typeof slot === 'object' ? slot.time : slot;
-                    timeEl.innerHTML += `<option value="${val}">${val}</option>`;
-                });
-                timeEl.disabled = false;
-            } else {
-                timeEl.innerHTML = '<option value="">No slots available</option>';
-            }
-        });
-});
+        fetch('api/appointments.php?action=getAvailableSlots&date=' + date)
+            .then(r => r.json())
+            .then(data => {
+                timeEl.innerHTML = '<option value="">-- Select Time --</option>';
+                if (data.success && data.data.length > 0) {
+                    data.data.forEach(slot => {
+                        const val = typeof slot === 'object' ? slot.time : slot;
+                        timeEl.innerHTML += `<option value="${val}">${val}</option>`;
+                    });
+                    timeEl.disabled = false;
+                } else {
+                    timeEl.innerHTML = '<option value="">No slots available</option>';
+                }
+            });
+    });
 
-// --- Submit new appointment form via AJAX ---
-document.getElementById('appointmentForm')?.addEventListener('submit', function (e) {
-    e.preventDefault();
-    const formData = new FormData(this);
+    // --- Submit new appointment form via AJAX ---
+    document.getElementById('appointmentForm')?.addEventListener('submit', function (e) {
+        e.preventDefault();
+        const formData = new FormData(this);
 
-    fetch(this.action || 'api/create_appointment.php', { method: 'POST', body: formData })
-        .then(r => r.json())
-        .then(data => {
-            if (!data.success) {
-                throw new Error(data.message || 'Appointment submission failed');
-            }
-            window.location.href = 'index.php?page=student_appointments&tab=history';
-        })
-        .catch(() => showToast('Error submitting appointment.', 'danger'));
-});
+        fetch(this.action || 'api/create_appointment.php', { method: 'POST', body: formData })
+            .then(r => r.json())
+            .then(data => {
+                if (!data.success) {
+                    throw new Error(data.message || 'Appointment submission failed');
+                }
+                window.location.href = 'index.php?page=student_appointments&tab=history';
+            })
+            .catch(() => showToast('Error submitting appointment.', 'danger'));
+    });
 
-// --- View appointment details ---
-function viewStudentAppointment(appointmentId) {
-    const modal   = new bootstrap.Modal(document.getElementById('studentDetailsModal'));
-    const content = document.getElementById('studentDetailsContent');
-    content.innerHTML = '<div class="text-center"><div class="spinner-border" role="status"></div></div>';
-    modal.show();
+    // --- View appointment details ---
+    function viewStudentAppointment(appointmentId) {
+        const modal = new bootstrap.Modal(document.getElementById('studentDetailsModal'));
+        const content = document.getElementById('studentDetailsContent');
+        content.innerHTML = '<div class="text-center"><div class="spinner-border" role="status"></div></div>';
+        modal.show();
 
-    fetch('api/appointments.php?action=getAppointmentDetails&id=' + appointmentId)
-        .then(r => r.json())
-        .then(data => {
-            if (!data.success) {
-                content.innerHTML = `<div class="alert alert-danger">${data.message}</div>`;
-                return;
-            }
-            const apt = data.data;
-            const statusColor = statusBadgeColor(apt.status);
+        fetch('api/appointments.php?action=getAppointmentDetails&id=' + appointmentId)
+            .then(r => r.json())
+            .then(data => {
+                if (!data.success) {
+                    content.innerHTML = `<div class="alert alert-danger">${data.message}</div>`;
+                    return;
+                }
+                const apt = data.data;
+                const statusColor = statusBadgeColor(apt.status);
 
-            let notesHtml = '';
-            if (apt.notes && apt.notes.length > 0) {
-                notesHtml = apt.notes.map(n => `
+                let notesHtml = '';
+                if (apt.notes && apt.notes.length > 0) {
+                    notesHtml = apt.notes.map(n => `
                     <div class="card mb-2 border-start border-primary border-3">
                         <div class="card-body py-2">
                             <p class="mb-1">${escapeHtml(n.note_text)}</p>
@@ -465,11 +476,11 @@ function viewStudentAppointment(appointmentId) {
                             </small>
                         </div>
                     </div>`).join('');
-            } else {
-                notesHtml = '<p class="text-muted small">No notes from officer yet.</p>';
-            }
+                } else {
+                    notesHtml = '<p class="text-muted small">No notes from officer yet.</p>';
+                }
 
-            content.innerHTML = `
+                content.innerHTML = `
                 <div class="row mb-3">
                     <div class="col-md-6">
                         <h6 class="text-muted">Appointment ID</h6>
@@ -477,7 +488,7 @@ function viewStudentAppointment(appointmentId) {
                     </div>
                     <div class="col-md-6">
                         <h6 class="text-muted">Status</h6>
-                        <p><span class="badge bg-${statusColor} fs-6">${apt.status.replace('_',' ')}</span></p>
+                        <p><span class="badge bg-${statusColor} fs-6">${apt.status.replace('_', ' ')}</span></p>
                     </div>
                 </div>
                 <div class="row mb-3">
@@ -513,71 +524,72 @@ function viewStudentAppointment(appointmentId) {
                 <h6><i class="fas fa-sticky-note"></i> Officer Notes</h6>
                 ${notesHtml}
             `;
-        })
-        .catch(() => {
-            content.innerHTML = '<div class="alert alert-danger">Error loading details</div>';
-        });
-}
-
-// --- Cancel appointment ---
-function confirmCancel(id) {
-    document.getElementById('cancelAppointmentId').value = id;
-    document.getElementById('cancelReason').value = '';
-    new bootstrap.Modal(document.getElementById('cancelModal')).show();
-}
-
-function submitCancel() {
-    const id     = document.getElementById('cancelAppointmentId').value;
-    const reason = document.getElementById('cancelReason').value.trim();
-    if (!reason) { alert('Please provide a cancellation reason.'); return; }
-
-    fetch('api/appointments.php?action=cancelAppointment', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({appointment_id: id, reason: reason})
-    })
-    .then(r => r.json())
-    .then(data => {
-        bootstrap.Modal.getInstance(document.getElementById('cancelModal'))?.hide();
-        if (data.success) {
-            showToast('Appointment cancelled.', 'warning');
-            setTimeout(() => location.reload(), 1200);
-        } else {
-            showToast(data.message, 'danger');
-        }
-    });
-}
-
-// --- Helpers ---
-function statusBadgeColor(status) {
-    const map = {
-        pending: 'warning', approved: 'info', in_progress: 'primary',
-        completed: 'success', rejected: 'danger', cancelled: 'secondary', rescheduled: 'info'
-    };
-    return map[status] || 'secondary';
-}
-
-function escapeHtml(str) {
-    return String(str)
-        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-}
-
-function showToast(message, type) {
-    let c = document.getElementById('toastContainer');
-    if (!c) {
-        c = document.createElement('div');
-        c.id = 'toastContainer';
-        c.style.cssText = 'position:fixed;top:20px;right:20px;z-index:9999;';
-        document.body.appendChild(c);
+            })
+            .catch(() => {
+                content.innerHTML = '<div class="alert alert-danger">Error loading details</div>';
+            });
     }
-    const toast = document.createElement('div');
-    toast.className = `alert alert-${type} alert-dismissible fade show shadow`;
-    toast.innerHTML = `${message}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
-    c.appendChild(toast);
-    setTimeout(() => toast.remove(), 4000);
-}
+
+    // --- Cancel appointment ---
+    function confirmCancel(id) {
+        document.getElementById('cancelAppointmentId').value = id;
+        document.getElementById('cancelReason').value = '';
+        new bootstrap.Modal(document.getElementById('cancelModal')).show();
+    }
+
+    function submitCancel() {
+        const id = document.getElementById('cancelAppointmentId').value;
+        const reason = document.getElementById('cancelReason').value.trim();
+        if (!reason) { alert('Please provide a cancellation reason.'); return; }
+
+        fetch('api/appointments.php?action=cancelAppointment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ appointment_id: id, reason: reason })
+        })
+            .then(r => r.json())
+            .then(data => {
+                bootstrap.Modal.getInstance(document.getElementById('cancelModal'))?.hide();
+                if (data.success) {
+                    showToast('Appointment cancelled.', 'warning');
+                    setTimeout(() => location.reload(), 1200);
+                } else {
+                    showToast(data.message, 'danger');
+                }
+            });
+    }
+
+    // --- Helpers ---
+    function statusBadgeColor(status) {
+        const map = {
+            pending: 'warning', approved: 'info', in_progress: 'primary',
+            completed: 'success', rejected: 'danger', cancelled: 'secondary', rescheduled: 'info'
+        };
+        return map[status] || 'secondary';
+    }
+
+    function escapeHtml(str) {
+        return String(str)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    function showToast(message, type) {
+        let c = document.getElementById('toastContainer');
+        if (!c) {
+            c = document.createElement('div');
+            c.id = 'toastContainer';
+            c.style.cssText = 'position:fixed;top:20px;right:20px;z-index:9999;';
+            document.body.appendChild(c);
+        }
+        const toast = document.createElement('div');
+        toast.className = `alert alert-${type} alert-dismissible fade show shadow`;
+        toast.innerHTML = `${message}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+        c.appendChild(toast);
+        setTimeout(() => toast.remove(), 4000);
+    }
 </script>
 
 </body>
+
 </html>
