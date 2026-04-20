@@ -324,15 +324,16 @@ class AppointmentModel
             $per_page = (int) $per_page;
             $offset = ($page - 1) * $per_page;
 
-            $query = "SELECT a.*, 
-                         c.category_name, 
-                         s.subcategory_name,
-                        st.name as student_name,
-                         st.email
+              $query = "SELECT a.*, 
+                        c.category_name, 
+                        s.subcategory_name,
+                        COALESCE(NULLIF(LTRIM(RTRIM(CONCAT(COALESCE(si.last_name, ''), ', ', COALESCE(si.first_name, '')))), ','), '') AS student_name,
+                        COALESCE(NULLIF(si.email, ''), '') AS email
                     FROM appointments a
                     JOIN appointment_categories c ON a.category_id = c.category_id
                     JOIN appointment_subcategories s ON a.subcategory_id = s.subcategory_id
                     JOIN students st ON a.student_id = st.student_id
+                    LEFT JOIN student_information si ON st.student_id = si.student_id
                   WHERE a.officer_id = ?";
 
             $params = [$officer_id];
@@ -394,14 +395,15 @@ class AppointmentModel
     // Get today's appointments for officer
     public function getOfficerTodayAppointments($officer_id)
     {
-        $query = "SELECT a.*, 
-                         c.category_name, 
-                         s.subcategory_name,
-                    st.name as student_name
+                $query = "SELECT a.*, 
+                                                 c.category_name, 
+                                                 s.subcategory_name,
+                                                 COALESCE(NULLIF(LTRIM(RTRIM(CONCAT(COALESCE(si.last_name, ''), ', ', COALESCE(si.first_name, '')))), ','), '') AS student_name
                 FROM appointments a
                 JOIN appointment_categories c ON a.category_id = c.category_id
                 JOIN appointment_subcategories s ON a.subcategory_id = s.subcategory_id
-                JOIN students st ON a.student_id = st.student_id
+                                JOIN students st ON a.student_id = st.student_id
+                                LEFT JOIN student_information si ON st.student_id = si.student_id
                   WHERE a.officer_id = ? 
                 AND CAST(a.scheduled_date AS DATE) = CAST(CURRENT_TIMESTAMP AS DATE)
                   AND a.status IN ('approved', 'in_progress')
@@ -645,8 +647,7 @@ class AppointmentModel
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }
 
-    // Check if time slot is available
-    // Check if time slot is available
+    // Check if time slot is available for officer pukinanginang time slot napakatagal kong inayos to
     public function isTimeSlotAvailable($officer_id, $scheduled_date, $exclude_appointment_id = null)
     {
         try {

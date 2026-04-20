@@ -32,6 +32,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' || isset($_GET['search'])) {
         $student_info = $studentModel->searchStudent($search_term);
 
         if ($student_info) {
+            $student_info['display_student_id'] = $studentModel->getStudentCodeFromEmail(
+                $student_info['email'] ?? '',
+                $student_info['student_number'] ?? ''
+            );
+
             // Get violations for this student
             $violations = $violationModel->getViolationsByStudent($student_info['student_id']);
             $violation_counts = $violationModel->getViolationCountByType($student_info['student_id']);

@@ -1,6 +1,8 @@
 <?php
 // view/partials/layout_top.php
 $pageTitle = $pageTitle ?? 'Violations Management System';
+$styleVersion = @filemtime(__DIR__ . '/../../css/style.css') ?: time();
+$appointmentsStyleVersion = @filemtime(__DIR__ . '/../../css/appointments.css') ?: time();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -11,7 +13,7 @@ $pageTitle = $pageTitle ?? 'Violations Management System';
     <title><?php echo htmlspecialchars($pageTitle); ?> - Student Violations System</title>
 
     <!-- Your custom CSS -->
-    <link rel="stylesheet" href="css/style.css" />
+    <link rel="stylesheet" href="css/style.css?v=<?php echo urlencode((string) $styleVersion); ?>" />
 
     <!-- Bootstrap CSS -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
@@ -20,7 +22,7 @@ $pageTitle = $pageTitle ?? 'Violations Management System';
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <!-- Appointment System CSS -->
-    <link rel="stylesheet" href="css/appointments.css" />
+    <link rel="stylesheet" href="css/appointments.css?v=<?php echo urlencode((string) $appointmentsStyleVersion); ?>" />
 
     <!-- FIX: Override excessive margins -->
     <style>
@@ -79,7 +81,7 @@ $pageTitle = $pageTitle ?? 'Violations Management System';
         <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
 
         <div class="app-main">
-            <header class="topbar">
+            <header class="topbar" >
                 <button class="sidebar-hamburger" type="button" id="sidebarToggle" aria-label="Toggle menu">
                     ☰
                 </button>

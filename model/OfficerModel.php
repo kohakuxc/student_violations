@@ -79,8 +79,7 @@ class OfficerModel
                         MAX(
                             CASE vt.severity_level
                                 WHEN 'minor' THEN 1
-                                WHEN 'moderate' THEN 2
-                                WHEN 'major' THEN 3
+                                WHEN 'major' THEN 2
                                 ELSE 0
                             END
                         ) AS max_sev
@@ -96,8 +95,7 @@ class OfficerModel
                 SELECT
                     SUM(CASE WHEN max_sev = 0 THEN 1 ELSE 0 END) AS none_count,
                     SUM(CASE WHEN max_sev = 1 THEN 1 ELSE 0 END) AS minor_count,
-                    SUM(CASE WHEN max_sev = 2 THEN 1 ELSE 0 END) AS moderate_count,
-                    SUM(CASE WHEN max_sev = 3 THEN 1 ELSE 0 END) AS major_count
+                    SUM(CASE WHEN max_sev = 2 THEN 1 ELSE 0 END) AS major_count
                 FROM monthly_max;
             ";
 
@@ -108,19 +106,75 @@ class OfficerModel
             return [
                 'none' => (int) ($row['none_count'] ?? 0),
                 'minor' => (int) ($row['minor_count'] ?? 0),
-                'moderate' => (int) ($row['moderate_count'] ?? 0),
                 'major' => (int) ($row['major_count'] ?? 0),
             ];
         } catch (PDOException $e) {
             error_log("Monthly Student Severity Report Error: " . $e->getMessage());
-            return ['none' => 0, 'minor' => 0, 'moderate' => 0, 'major' => 0];
+            return ['none' => 0, 'minor' => 0, 'major' => 0];
+        }
+    }
+
+    /**
+     * Get aggregated student severity counts across a date range.
+     * Counts each student's highest severity violation within the date range.
+     *
+     * @param string $from_month (YYYY-MM format)
+     * @param string $to_month (YYYY-MM format)
+     * @return array ['none'=>int,'minor'=>int,'major'=>int]
+     */
+    public function getDateRangeStudentSeverityCounts($from_month, $to_month)
+    {
+        try {
+            $startDate = $from_month . "-01";
+            $endDate = date("Y-m-d", strtotime($to_month . "-01 +1 month"));
+
+            $query = "
+                WITH range_max AS (
+                    SELECT
+                        s.student_id,
+                        MAX(
+                            CASE vt.severity_level
+                                WHEN 'minor' THEN 1
+                                WHEN 'major' THEN 2
+                                ELSE 0
+                            END
+                        ) AS max_sev
+                    FROM students s
+                    LEFT JOIN violations v
+                        ON v.student_id = s.student_id
+                       AND v.date_of_violation >= ?
+                       AND v.date_of_violation < ?
+                    LEFT JOIN violation_types vt
+                        ON vt.violation_type_id = v.violation_type
+                    GROUP BY s.student_id
+                )
+                SELECT
+                    SUM(CASE WHEN max_sev = 0 THEN 1 ELSE 0 END) AS none_count,
+                    SUM(CASE WHEN max_sev = 1 THEN 1 ELSE 0 END) AS minor_count,
+                    SUM(CASE WHEN max_sev = 2 THEN 1 ELSE 0 END) AS major_count
+                FROM range_max;
+            ";
+
+            $stmt = $this->conn->prepare($query);
+            $stmt->execute([$startDate, $endDate]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            return [
+                'none' => (int) ($row['none_count'] ?? 0),
+                'minor' => (int) ($row['minor_count'] ?? 0),
+                'major' => (int) ($row['major_count'] ?? 0),
+            ];
+        } catch (PDOException $e) {
+            error_log("Date Range Student Severity Report Error: " . $e->getMessage());
+            return ['none' => 0, 'minor' => 0, 'major' => 0];
         }
     }
 
     /**
      * Overall report (violations): count violation records by severity (all time).
+     * Note: After violation type update, only 'minor' and 'major' severity levels exist.
      *
-     * @return array ['minor'=>int,'moderate'=>int,'major'=>int]
+     * @return array ['minor'=>int,'major'=>int]
      */
     public function getOverallViolationCountsBySeverity()
     {
@@ -128,7 +182,6 @@ class OfficerModel
             $query = "
                 SELECT
                     SUM(CASE WHEN vt.severity_level = 'minor' THEN 1 ELSE 0 END) AS minor_count,
-                    SUM(CASE WHEN vt.severity_level = 'moderate' THEN 1 ELSE 0 END) AS moderate_count,
                     SUM(CASE WHEN vt.severity_level = 'major' THEN 1 ELSE 0 END) AS major_count
                 FROM violations v
                 LEFT JOIN violation_types vt
@@ -141,12 +194,11 @@ class OfficerModel
 
             return [
                 'minor' => (int) ($row['minor_count'] ?? 0),
-                'moderate' => (int) ($row['moderate_count'] ?? 0),
                 'major' => (int) ($row['major_count'] ?? 0),
             ];
         } catch (PDOException $e) {
             error_log("Overall Violation Severity Report Error: " . $e->getMessage());
-            return ['minor' => 0, 'moderate' => 0, 'major' => 0];
+            return ['minor' => 0, 'major' => 0];
         }
     }
 
@@ -170,6 +222,7 @@ class OfficerModel
     /**
      * Yearly overview (students): for each month (Jan to Dec), count students by highest severity in that month.
      * Includes "none" = students with zero violations in that month.
+     * Note: After violation type update, only 'minor' and 'major' severity levels exist.
      *
      * @param int $year (e.g., 2026)
      * @return array
@@ -177,7 +230,6 @@ class OfficerModel
      *   'labels' => ['Jan',...,'Dec'],
      *   'none' => [int...12],
      *   'minor' => [int...12],
-     *   'moderate' => [int...12],
      *   'major' => [int...12]
      * ]
      */
@@ -189,7 +241,6 @@ class OfficerModel
             'labels' => $labels,
             'none' => array_fill(0, 12, 0),
             'minor' => array_fill(0, 12, 0),
-            'moderate' => array_fill(0, 12, 0),
             'major' => array_fill(0, 12, 0),
         ];
 
@@ -202,7 +253,6 @@ class OfficerModel
                 $idx = $m - 1;
                 $result['none'][$idx] = (int) $counts['none'];
                 $result['minor'][$idx] = (int) $counts['minor'];
-                $result['moderate'][$idx] = (int) $counts['moderate'];
                 $result['major'][$idx] = (int) $counts['major'];
             }
 

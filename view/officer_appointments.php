@@ -78,7 +78,7 @@ function getStatusBadgeColor($status) {
 
     <!-- Appointments Card -->
     <div class="card">
-        <div class="card-header bg-primary text-white">
+        <div class="card-header text-white">
             <h5 class="mb-0"><i class="fas fa-list"></i> All Appointments</h5>
         </div>
         <div class="card-body">
@@ -190,7 +190,7 @@ function getStatusBadgeColor($status) {
 <div class="modal fade" id="approveModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
-            <div class="modal-header bg-success text-white">
+            <div class="modal-header appointment-modal-header text-white">
                 <h5 class="modal-title"><i class="fas fa-check-circle"></i> Approve Appointment</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
@@ -216,7 +216,7 @@ function getStatusBadgeColor($status) {
 <div class="modal fade" id="rejectModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
-            <div class="modal-header bg-danger text-white">
+            <div class="modal-header appointment-modal-header text-white">
                 <h5 class="modal-title"><i class="fas fa-times-circle"></i> Reject Appointment</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>

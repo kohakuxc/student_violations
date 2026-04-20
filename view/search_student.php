@@ -8,10 +8,16 @@ include 'view/partials/layout_top.php'; ?>
   </div>
 
   <form method="POST" action="index.php?page=search_student" class="search-form">
-    <input type="text" name="search" placeholder="Enter student name or student ID..."
-      value="<?php echo htmlspecialchars($_POST['search'] ?? ''); ?>" required>
+    <div class="student-lookup-wrap">
+      <input type="text" id="student_lookup" name="search"
+        placeholder="Enter First Name, Last Name, or Student Number..."
+        value="<?php echo htmlspecialchars($_POST['search'] ?? ''); ?>" autocomplete="off" required>
+      <div id="student_lookup_results" class="student-lookup-results d-none"></div>
+    </div>
     <button type="submit" class="btn btn-primary">Search</button>
   </form>
+
+<script src="assets/js/student_lookup.js"></script>
 
   <?php if ($search_performed && $student_info): ?>
     <div class="student-info">
@@ -23,7 +29,7 @@ include 'view/partials/layout_top.php'; ?>
         </div>
         <div class="info-item">
           <label>Student ID:</label>
-          <span><?php echo htmlspecialchars($student_info['student_number']); ?></span>
+          <span><?php echo htmlspecialchars($student_info['display_student_id'] ?? $student_info['student_number']); ?></span>
         </div>
         <div class="info-item">
           <label>Email:</label>
@@ -87,7 +93,7 @@ include 'view/partials/layout_top.php'; ?>
 
   <?php elseif ($search_performed && !$student_info): ?>
     <div class="alert alert-error">
-      ❌ Student not found! Please check the name or student ID.
+      ❌ Student not found! Please check the name or student number.
     </div>
   <?php endif; ?>
 </div>

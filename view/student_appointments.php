@@ -79,7 +79,7 @@ function getStatusBadgeColor($status) {
         <!-- ===== New Appointment Tab ===== -->
         <div id="new-appointment" class="tab-pane fade <?php echo $activeTab === 'new-appointment' ? 'show active' : ''; ?>">
             <div class="card">
-                <div class="card-header bg-primary text-white">
+                <div class="card-header text-white">
                     <h5 class="mb-0"><i class="fas fa-file-alt"></i> Create New Appointment</h5>
                 </div>
                 <div class="card-body">
@@ -270,7 +270,7 @@ function getStatusBadgeColor($status) {
         <!-- ===== History Tab ===== -->
         <div id="history" class="tab-pane fade <?php echo $activeTab === 'history' ? 'show active' : ''; ?>">
             <div class="card">
-                <div class="card-header bg-primary text-white">
+                <div class="card-header text-white">
                     <h5 class="mb-0"><i class="fas fa-history"></i> Appointment History</h5>
                 </div>
                 <div class="card-body">

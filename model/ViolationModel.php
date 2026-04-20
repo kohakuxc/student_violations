@@ -62,10 +62,11 @@ class ViolationModel
                              v.description,
                              v.date_of_violation,
                              v.created_at,
-                             s.name as student_name,
+                         COALESCE(NULLIF(LTRIM(RTRIM(CONCAT(COALESCE(si.last_name, ''), ', ', COALESCE(si.first_name, '')))), ','), '') AS student_name,
                              o.name as officer_name
                       FROM violations v
                       JOIN students s ON v.student_id = s.student_id
+                     LEFT JOIN student_information si ON s.student_id = si.student_id
                       JOIN officers o ON v.officer_id = o.officer_id
                       LEFT JOIN violation_types vt ON v.violation_type = vt.violation_type_id
                       ORDER BY v.created_at DESC";
@@ -128,11 +129,12 @@ class ViolationModel
                        v.description,
                        v.date_of_violation,
                        v.created_at,
-                       s.name AS student_name,
+                      COALESCE(NULLIF(LTRIM(RTRIM(CONCAT(COALESCE(si.last_name, ''), ', ', COALESCE(si.first_name, '')))), ','), '') AS student_name,
                        o.name AS officer_name,
                        COALESCE(vt.severity_level, 'unknown') AS severity_level
                 FROM violations v
                 JOIN students s ON v.student_id = s.student_id
+                  LEFT JOIN student_information si ON s.student_id = si.student_id
                 JOIN officers o ON v.officer_id = o.officer_id
                 LEFT JOIN violation_types vt ON v.violation_type = vt.violation_type_id
                 ORDER BY v.created_at DESC
@@ -146,11 +148,12 @@ class ViolationModel
                        v.description,
                        v.date_of_violation,
                        v.created_at,
-                       s.name AS student_name,
+                      COALESCE(NULLIF(LTRIM(RTRIM(CONCAT(COALESCE(si.last_name, ''), ', ', COALESCE(si.first_name, '')))), ','), '') AS student_name,
                        o.name AS officer_name,
                        COALESCE(vt.severity_level, 'unknown') AS severity_level
                 FROM violations v
                 JOIN students s ON v.student_id = s.student_id
+                  LEFT JOIN student_information si ON s.student_id = si.student_id
                 JOIN officers o ON v.officer_id = o.officer_id
                 LEFT JOIN violation_types vt ON v.violation_type = vt.violation_type_id
                 ORDER BY v.created_at DESC
