@@ -23,7 +23,7 @@ body {
 
 /* Topbar stays fixed */
 .topbar {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #0B5793;
   color: white;
   display: flex;
   align-items: center;
@@ -257,7 +257,7 @@ textarea {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #0B5793;
   color: white;
 }
 

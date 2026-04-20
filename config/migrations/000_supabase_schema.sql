@@ -12,6 +12,16 @@ create table if not exists public.students (
     created_at timestamptz not null default now()
 );
 
+create table if not exists public.student_information (
+    student_id bigint primary key references public.students(student_id) on delete cascade,
+    last_name text not null,
+    first_name text not null,
+    student_num text not null unique check (student_num ~ '^[0-9]{6}$'),
+    email text not null unique,
+    created_at timestamptz not null default now(),
+    updated_at timestamptz null
+);
+
 create table if not exists public.officers (
     officer_id bigserial primary key,
     username text not null unique,

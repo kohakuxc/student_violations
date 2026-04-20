@@ -16,10 +16,23 @@
 
   <form method="POST" action="index.php?page=add_violation" class="violation-form">
     <div class="form-group">
-      <label for="student_number">Student ID/Number: <span class="required">*</span></label>
-      <input type="text" id="student_number" name="student_number"
-             value="<?php echo htmlspecialchars($student_number ?? ''); ?>"
-             placeholder="e.g., STU001" required>
+      <label for="student_lookup">Student Name / Student Number: <span class="required">*</span></label>
+      <div class="student-lookup-wrap">
+        <input type="hidden" id="student_id" name="student_id" value="<?php echo htmlspecialchars($student_id ?? ''); ?>">
+        <input type="text" id="student_lookup" name="student_lookup"
+               value="<?php echo htmlspecialchars($student_lookup ?? ''); ?>"
+               placeholder="Type First Name, Last Name or Student Number to search..."
+               autocomplete="off" required>
+        <div id="student_lookup_results" class="student-lookup-results d-none"></div>
+      </div>
+      <div id="selected_student_card" class="student-selected-card <?php echo empty($selected_student) ? 'd-none' : ''; ?>">
+        <strong id="selected_student_name"><?php echo htmlspecialchars($selected_student['name'] ?? ''); ?></strong>
+        <div id="selected_student_meta" class="student-selected-meta">
+          <?php if (!empty($selected_student)): ?>
+            <?php echo htmlspecialchars(($selected_student['student_number'] ?? '') . ' · ' . ($selected_student['email'] ?? '')); ?>
+          <?php endif; ?>
+        </div>
+      </div>
     </div>
 
     <div class="form-group">
@@ -54,5 +67,7 @@
     </div>
   </form>
 </div>
+
+<script src="assets/js/student_lookup.js"></script>
 
 <?php include 'view/partials/layout_bottom.php'; ?>

@@ -8,6 +8,7 @@ class StudentAuthModel
 {
     private $conn;
     private $studentsTableColumns = null;
+    private $studentInfoTableColumns = null;
 
     public function __construct()
     {
@@ -200,9 +201,9 @@ class StudentAuthModel
         try {
             $email = trim(strtolower($email));
 
-            $query = "SELECT student_id, name, student_number, email 
-                      FROM students 
-                      WHERE LOWER(LTRIM(RTRIM(email))) = ?";
+            $query = $this->buildNormalizedStudentSelect(
+                "LOWER(" . $this->normalizedStudentEmailExpression() . ") = ?"
+            );
             $stmt = $this->conn->prepare($query);
             $stmt->execute([$email]);
 
@@ -219,9 +220,9 @@ class StudentAuthModel
     public function getStudentByNumber($student_number)
     {
         try {
-            $query = "SELECT student_id, name, student_number, email
-                      FROM students
-                      WHERE student_number = ?";
+            $query = $this->buildNormalizedStudentSelect(
+                $this->normalizedStudentNumberExpression() . " = ?"
+            );
             $stmt = $this->conn->prepare($query);
             $stmt->execute([$student_number]);
 
@@ -238,9 +239,7 @@ class StudentAuthModel
     public function findStudentByMicrosoftId($microsoft_id)
     {
         try {
-            $query = "SELECT student_id, name, student_number, email
-                      FROM students
-                      WHERE microsoft_id = ?";
+            $query = $this->buildNormalizedStudentSelect("s.microsoft_id = ?");
             $stmt = $this->conn->prepare($query);
             $stmt->execute([$microsoft_id]);
 
@@ -281,6 +280,186 @@ class StudentAuthModel
         return $this->studentsTableColumns;
     }
 
+    private function driverName()
+    {
+        return $this->conn->getAttribute(PDO::ATTR_DRIVER_NAME);
+    }
+
+    private function isPgsql()
+    {
+        return $this->driverName() === 'pgsql';
+    }
+
+    private function getStudentInfoTableColumns()
+    {
+        if ($this->studentInfoTableColumns !== null) {
+            return $this->studentInfoTableColumns;
+        }
+
+        try {
+            $query = "SELECT COLUMN_NAME
+                      FROM INFORMATION_SCHEMA.COLUMNS
+                      WHERE TABLE_NAME = 'student_information'";
+            $stmt = $this->conn->prepare($query);
+            $stmt->execute();
+
+            $columns = [];
+            foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $columnName) {
+                $columns[strtolower(trim((string) $columnName))] = true;
+            }
+
+            $this->studentInfoTableColumns = $columns;
+        } catch (PDOException $e) {
+            error_log("Get Student Information Table Columns Error: " . $e->getMessage());
+            $this->studentInfoTableColumns = [];
+        }
+
+        return $this->studentInfoTableColumns;
+    }
+
+    private function hasStudentInformationTable()
+    {
+        return !empty($this->getStudentInfoTableColumns());
+    }
+
+    private function normalizedStudentNameExpression()
+    {
+        if (!$this->hasStudentInformationTable()) {
+            return "''";
+        }
+
+        return "COALESCE(NULLIF(LTRIM(RTRIM(CONCAT(COALESCE(si.last_name, ''), ', ', COALESCE(si.first_name, '')))), ','), '')";
+    }
+
+    private function normalizedStudentNumberExpression()
+    {
+        if (!$this->hasStudentInformationTable()) {
+            return "''";
+        }
+
+        return "COALESCE(NULLIF(si.student_num, ''), '')";
+    }
+
+    private function normalizedStudentEmailExpression()
+    {
+        if (!$this->hasStudentInformationTable()) {
+            return "''";
+        }
+
+        return "COALESCE(NULLIF(si.email, ''), '')";
+    }
+
+    private function buildNormalizedStudentSelect($whereClause)
+    {
+        if ($this->hasStudentInformationTable()) {
+            return "SELECT s.student_id,
+                           " . $this->normalizedStudentNameExpression() . " AS name,
+                           " . $this->normalizedStudentNumberExpression() . " AS student_number,
+                           " . $this->normalizedStudentEmailExpression() . " AS email
+                    FROM students s
+                    LEFT JOIN student_information si ON si.student_id = s.student_id
+                    WHERE " . $whereClause;
+        }
+
+        return "SELECT s.student_id,
+                   '' AS name,
+                   '' AS student_number,
+                   '' AS email
+                FROM students s
+                WHERE " . $whereClause;
+    }
+
+    private function extractStudentNumberFromEmail($email, $fallback = '')
+    {
+        $email = strtolower(trim((string) $email));
+        if ($email === '') {
+            return (string) $fallback;
+        }
+
+        $localPart = strstr($email, '@', true);
+        if ($localPart === false) {
+            $localPart = $email;
+        }
+
+        if (preg_match('/(\d{6})/', $localPart, $matches)) {
+            return $matches[1];
+        }
+
+        return (string) $fallback;
+    }
+
+    private function parseNameParts(array $profile, $email)
+    {
+        $firstName = trim((string) ($profile['givenName'] ?? ''));
+        $lastName = trim((string) ($profile['surname'] ?? ''));
+        $displayName = trim((string) ($profile['displayName'] ?? ''));
+
+        if ($firstName === '' || $lastName === '') {
+            if (strpos($displayName, ',') !== false) {
+                $parts = explode(',', $displayName, 2);
+                $lastName = $lastName !== '' ? $lastName : trim((string) ($parts[0] ?? ''));
+                $firstName = $firstName !== '' ? $firstName : trim((string) preg_replace('/\s*\(.*\)$/', '', (string) ($parts[1] ?? '')));
+            } elseif ($displayName !== '') {
+                $parts = preg_split('/\s+/', $displayName, 2);
+                $firstName = $firstName !== '' ? $firstName : trim((string) ($parts[0] ?? ''));
+                $lastName = $lastName !== '' ? $lastName : trim((string) ($parts[1] ?? ''));
+            }
+        }
+
+        if ($firstName === '' && $lastName === '') {
+            $localPart = strstr((string) $email, '@', true);
+            $firstName = trim((string) ($localPart !== false ? $localPart : $email));
+        }
+
+        return [
+            'first_name' => $firstName,
+            'last_name' => $lastName
+        ];
+    }
+
+    private function buildLegacyName($first_name, $last_name)
+    {
+        $first_name = trim((string) $first_name);
+        $last_name = trim((string) $last_name);
+
+        if ($last_name !== '' && $first_name !== '') {
+            return $last_name . ', ' . $first_name . ' (Student)';
+        }
+
+        return trim($last_name . ' ' . $first_name);
+    }
+
+    private function upsertStudentInformation($student_id, $first_name, $last_name, $student_num, $email)
+    {
+        if (!$this->hasStudentInformationTable()) {
+            return;
+        }
+
+        if ($this->isPgsql()) {
+            $query = "INSERT INTO student_information (student_id, last_name, first_name, student_num, email)
+                      VALUES (?, ?, ?, ?, ?)
+                      ON CONFLICT (student_id)
+                      DO UPDATE SET last_name = EXCLUDED.last_name,
+                                    first_name = EXCLUDED.first_name,
+                                    student_num = EXCLUDED.student_num,
+                                    email = EXCLUDED.email";
+            $stmt = $this->conn->prepare($query);
+            $stmt->execute([$student_id, $last_name, $first_name, $student_num, $email]);
+            return;
+        }
+
+        $update = $this->conn->prepare("UPDATE student_information
+                                        SET last_name = ?, first_name = ?, student_num = ?, email = ?
+                                        WHERE student_id = ?");
+        $update->execute([$last_name, $first_name, $student_num, $email, $student_id]);
+
+        if ($update->rowCount() === 0) {
+            $insert = $this->conn->prepare("INSERT INTO student_information (student_id, last_name, first_name, student_num, email)
+                                            VALUES (?, ?, ?, ?, ?)");
+            $insert->execute([$student_id, $last_name, $first_name, $student_num, $email]);
+        }
+    }
+
     /**
      * Check whether a students column exists.
      */
@@ -311,47 +490,68 @@ class StudentAuthModel
 
     /**
      * Create a new student row from a Microsoft profile.
-     *
-     * Note: age is not available from Microsoft Graph by default, so it must
-     * be collected later if your database requires it.
      */
     public function createStudentFromMicrosoftProfile(array $profile, $access_token)
     {
         try {
             $email = strtolower(trim($profile['mail'] ?? $profile['userPrincipalName'] ?? ''));
-            $name = trim($profile['displayName'] ?? '');
             $microsoft_id = trim($profile['id'] ?? '');
 
             if ($email === '' || $microsoft_id === '') {
                 return ['success' => false, 'message' => 'Microsoft profile is missing required identity fields'];
             }
 
-            if ($name === '') {
-                $name = trim(($profile['givenName'] ?? '') . ' ' . ($profile['surname'] ?? ''));
+            $nameParts = $this->parseNameParts($profile, $email);
+            $first_name = trim((string) ($nameParts['first_name'] ?? ''));
+            $last_name = trim((string) ($nameParts['last_name'] ?? ''));
+            $legacy_name = $this->buildLegacyName($first_name, $last_name);
+            if ($legacy_name === '') {
+                $legacy_name = $email;
             }
 
-            if ($name === '') {
-                $name = $email;
+            $student_number = $this->extractStudentNumberFromEmail($email);
+            if ($student_number === '') {
+                $student_number = $this->generateAutoStudentNumber($email, $microsoft_id);
             }
-
-            $student_number = $this->generateAutoStudentNumber($email, $microsoft_id);
             $encrypted_token = base64_encode($access_token);
 
-            $insertColumns = ['name', 'student_number', 'email'];
-            $insertValues = [$name, $student_number, $email];
+            $insertColumns = [];
+            $insertValues = [];
+            $valueParts = [];
+
+            if ($this->studentsColumnExists('name')) {
+                $insertColumns[] = 'name';
+                $insertValues[] = $legacy_name;
+                $valueParts[] = '?';
+            }
+
+            if ($this->studentsColumnExists('student_number')) {
+                $insertColumns[] = 'student_number';
+                $insertValues[] = $student_number;
+                $valueParts[] = '?';
+            }
+
+            if ($this->studentsColumnExists('email')) {
+                $insertColumns[] = 'email';
+                $insertValues[] = $email;
+                $valueParts[] = '?';
+            }
 
             if ($this->studentsColumnExists('microsoft_id')) {
                 $insertColumns[] = 'microsoft_id';
                 $insertValues[] = $microsoft_id;
+                $valueParts[] = '?';
             }
 
             if ($this->studentsColumnExists('oauth_token')) {
                 $insertColumns[] = 'oauth_token';
                 $insertValues[] = $encrypted_token;
+                $valueParts[] = '?';
             }
 
             if ($this->studentsColumnExists('last_login')) {
                 $insertColumns[] = 'last_login';
+                $valueParts[] = 'CURRENT_TIMESTAMP';
             }
 
             // Avoid accidental student_number collision.
@@ -365,14 +565,11 @@ class StudentAuthModel
                 }
             }
 
-            $placeholders = array_fill(0, count($insertValues), '?');
-
-            if ($this->studentsColumnExists('last_login')) {
-                $query = "INSERT INTO students (" . implode(', ', $insertColumns) . ")
-                          VALUES (" . implode(', ', $placeholders) . ", CURRENT_TIMESTAMP)";
+            if (empty($insertColumns)) {
+                $query = "INSERT INTO students DEFAULT VALUES";
             } else {
                 $query = "INSERT INTO students (" . implode(', ', $insertColumns) . ")
-                          VALUES (" . implode(', ', $placeholders) . ")";
+                          VALUES (" . implode(', ', $valueParts) . ")";
             }
 
             $stmt = $this->conn->prepare($query);
@@ -385,6 +582,19 @@ class StudentAuthModel
 
             if (!$student) {
                 return ['success' => false, 'message' => 'Student created but could not be reloaded'];
+            }
+
+            $this->upsertStudentInformation(
+                (int) $student['student_id'],
+                $first_name,
+                $last_name,
+                $student_number,
+                $email
+            );
+
+            $student = $this->findStudentByMicrosoftId($microsoft_id);
+            if (!$student) {
+                $student = $this->findStudentByEmail($email);
             }
 
             return ['success' => true, 'student' => $student, 'created' => true];
@@ -401,15 +611,9 @@ class StudentAuthModel
     {
         $email = strtolower(trim($profile['mail'] ?? $profile['userPrincipalName'] ?? ''));
         $microsoft_id = trim($profile['id'] ?? '');
-        $name = trim($profile['displayName'] ?? '');
-
-        if ($name === '') {
-            $name = trim(($profile['givenName'] ?? '') . ' ' . ($profile['surname'] ?? ''));
-        }
-
-        if ($name === '') {
-            $name = $email;
-        }
+        $nameParts = $this->parseNameParts($profile, $email);
+        $first_name = trim((string) ($nameParts['first_name'] ?? ''));
+        $last_name = trim((string) ($nameParts['last_name'] ?? ''));
 
         $student = null;
 
@@ -427,7 +631,8 @@ class StudentAuthModel
 
         $updateResult = $this->syncStudentOAuthData(
             $student['student_id'],
-            $name,
+            $first_name,
+            $last_name,
             $email,
             $microsoft_id,
             $access_token
@@ -458,33 +663,8 @@ class StudentAuthModel
             // Encrypt token (basic encryption - use stronger in production)
             $encrypted_token = base64_encode($access_token);
 
-            $query = "UPDATE students 
-                      SET microsoft_id = ?, oauth_token = ?, last_login = CURRENT_TIMESTAMP
-                      WHERE student_id = ?";
-            $stmt = $this->conn->prepare($query);
-            $result = $stmt->execute([$microsoft_id, $encrypted_token, $student_id]);
-
-            if ($result) {
-                return ['success' => true];
-            } else {
-                return ['success' => false, 'message' => 'Failed to update student'];
-            }
-        } catch (PDOException $e) {
-            error_log("Update Student OAuth Data Error: " . $e->getMessage());
-            return ['success' => false, 'message' => 'Database error'];
-        }
-    }
-
-    /**
-     * Keep the local student row synchronized with Microsoft profile data.
-     */
-    public function syncStudentOAuthData($student_id, $name, $email, $microsoft_id, $access_token)
-    {
-        try {
-            $encrypted_token = base64_encode($access_token);
-
-            $setParts = ['name = ?', 'email = ?'];
-            $params = [$name, $email];
+            $setParts = [];
+            $params = [];
 
             if ($this->studentsColumnExists('microsoft_id')) {
                 $setParts[] = 'microsoft_id = ?';
@@ -500,6 +680,10 @@ class StudentAuthModel
                 $setParts[] = 'last_login = CURRENT_TIMESTAMP';
             }
 
+            if (empty($setParts)) {
+                return ['success' => true];
+            }
+
             $query = "UPDATE students
                       SET " . implode(', ', $setParts) . "
                       WHERE student_id = ?";
@@ -508,6 +692,84 @@ class StudentAuthModel
             $result = $stmt->execute($params);
 
             if ($result) {
+                return ['success' => true];
+            } else {
+                return ['success' => false, 'message' => 'Failed to update student'];
+            }
+        } catch (PDOException $e) {
+            error_log("Update Student OAuth Data Error: " . $e->getMessage());
+            return ['success' => false, 'message' => 'Database error'];
+        }
+    }
+
+    /**
+     * Keep the local student row synchronized with Microsoft profile data.
+     */
+    public function syncStudentOAuthData($student_id, $first_name, $last_name, $email, $microsoft_id, $access_token)
+    {
+        try {
+            $encrypted_token = base64_encode($access_token);
+            $student_number = $this->extractStudentNumberFromEmail($email);
+            if ($student_number === '') {
+                $student_number = $this->generateAutoStudentNumber($email, $microsoft_id);
+            }
+
+            $legacy_name = $this->buildLegacyName($first_name, $last_name);
+            if ($legacy_name === '') {
+                $legacy_name = $email;
+            }
+
+            $setParts = [];
+            $params = [];
+
+            if ($this->studentsColumnExists('name')) {
+                $setParts[] = 'name = ?';
+                $params[] = $legacy_name;
+            }
+
+            if ($this->studentsColumnExists('email')) {
+                $setParts[] = 'email = ?';
+                $params[] = $email;
+            }
+
+            if ($this->studentsColumnExists('student_number')) {
+                $setParts[] = 'student_number = ?';
+                $params[] = $student_number;
+            }
+
+            if ($this->studentsColumnExists('microsoft_id')) {
+                $setParts[] = 'microsoft_id = ?';
+                $params[] = $microsoft_id;
+            }
+
+            if ($this->studentsColumnExists('oauth_token')) {
+                $setParts[] = 'oauth_token = ?';
+                $params[] = $encrypted_token;
+            }
+
+            if ($this->studentsColumnExists('last_login')) {
+                $setParts[] = 'last_login = CURRENT_TIMESTAMP';
+            }
+
+            if (empty($setParts)) {
+                return ['success' => true];
+            }
+
+            $query = "UPDATE students
+                      SET " . implode(', ', $setParts) . "
+                      WHERE student_id = ?";
+            $stmt = $this->conn->prepare($query);
+            $params[] = $student_id;
+            $result = $stmt->execute($params);
+
+            if ($result) {
+                $this->upsertStudentInformation(
+                    (int) $student_id,
+                    $first_name,
+                    $last_name,
+                    $student_number,
+                    $email
+                );
                 return ['success' => true];
             }
 

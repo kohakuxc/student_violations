@@ -24,9 +24,14 @@
 }
 
 .card-header {
+    background: #0B5793;
     border-bottom: 2px solid rgba(0, 0, 0, 0.125);
     font-weight: 600;
     padding: 1.25rem;
+}
+
+.appointment-modal-header {
+    background: #0B5793;
 }
 
 /* Tabs */
@@ -58,17 +63,17 @@
 }
 
 .nav-tabs .nav-link:hover {
-    color: #0d6efd;
-    border-bottom-color: #0d6efd;
+    color: #0B5793;
+    border-bottom-color: #0B5793;
     background: transparent !important;
     box-shadow: none !important;
 }
 
 .nav-tabs .nav-link.active {
-    color: #0d6efd;
+    color: #0B5793;
     background: transparent !important;
     border: 0 !important;
-    border-bottom: 3px solid #0d6efd !important;
+    border-bottom: 3px solid #0B5793 !important;
     box-shadow: none !important;
 }
 
@@ -123,7 +128,7 @@
 
 .form-control:focus,
 .form-select:focus {
-    border-color: #0d6efd;
+    border-color: #0B5793;
     box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
 }
 
@@ -239,13 +244,13 @@
 }
 
 .btn-primary {
-    background-color: #0d6efd;
-    border-color: #0d6efd;
+    background-color: #0B5793;
+    border-color: #0B5793;
 }
 
 .btn-primary:hover {
-    background-color: #0b5ed7;
-    border-color: #0b5ed7;
+    background-color: #0B5793;
+    border-color: #0B5793;
 }
 
 .btn-success {
@@ -396,7 +401,7 @@
 
 .page-item .page-link {
     border: 1px solid #dee2e6;
-    color: #0d6efd;
+    color: #0B5793;
     border-radius: 0.35rem;
     transition: all 0.3s ease;
     padding: 0.5rem 0.75rem;
@@ -409,8 +414,8 @@
 }
 
 .page-item.active .page-link {
-    background-color: #0d6efd;
-    border-color: #0d6efd;
+    background-color: #0B5793;
+    border-color: #0B5793;
 }
 
 .page-item.disabled .page-link {
@@ -495,12 +500,12 @@
 .form-control:focus,
 .form-select:focus,
 .btn:focus {
-    outline: 2px solid #0d6efd;
+    outline: 2px solid #0B5793;
     outline-offset: 2px;
 }
 
 a:focus {
-    outline: 2px solid #0d6efd;
+    outline: 2px solid #0B5793;
     outline-offset: 2px;
 }
 
@@ -509,7 +514,7 @@ a:focus {
     width: 2rem;
     height: 2rem;
     border-width: 0.2em;
-    color: #0d6efd;
+    color: #0B5793;
 }
 
 /* Description Box */

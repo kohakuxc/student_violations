@@ -45,6 +45,7 @@ $showStudentTab = (($_GET['tab'] ?? '') === 'student-login') || isset($_GET['stu
             align-items: center;
             padding: 0 28px;
             border-top: 10px solid #f4d03f;
+            box-sizing: border-box;
         }
 
         .login-topbar .brand {
@@ -52,10 +53,17 @@ $showStudentTab = (($_GET['tab'] ?? '') === 'student-login') || isset($_GET['stu
             font-weight: 900;
             font-size: 34px;
             letter-spacing: 0.2px;
+            display: flex;
+            align-items: center;
+            height: 100%;
+            padding-top: 1px;
         }
 
         .login-topbar .brand img {
-            height: 32px;
+            height: 60px;
+            max-height: calc(100% - 10px);
+            width: auto;
+            display: block;
         }
 
         .login-hero {
@@ -300,7 +308,7 @@ $showStudentTab = (($_GET['tab'] ?? '') === 'student-login') || isset($_GET['stu
 <body class="login-page">
     <header class="login-topbar">
         <div class="brand">
-            <img src="assets/img/onesti_logo.png" alt="one sti">
+            <img src="assets/img/axcelerate_logo.png" alt="axcelerate logo">
         </div>
     </header>
 
@@ -308,7 +316,7 @@ $showStudentTab = (($_GET['tab'] ?? '') === 'student-login') || isset($_GET['stu
         <div class="login-content">
             <div class="login-card">
                 <div class="login-logo">
-                    <img src="assets/img/sti_logo.png" alt="STI">
+                    <img src="assets/img/ax_logo.png" alt="ax">
                 </div>
 
                 <!-- Tab Navigation -->
@@ -379,12 +387,6 @@ $showStudentTab = (($_GET['tab'] ?? '') === 'student-login') || isset($_GET['stu
                             SIGN IN WITH YOUR O365 ACCOUNT
                         </button>
                     <?php endif; ?>
-                </div>
-
-
-
-                <div class="login-footer">
-                    © STI Education Services Group, Inc. All Rights Reserved.
                 </div>
             </div>
         </div>
