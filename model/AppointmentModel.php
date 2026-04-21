@@ -713,10 +713,16 @@ class AppointmentModel
             $this->conn->beginTransaction();
 
             // Update appointment status
-            $this->updateAppointmentStatus($appointment_id, 'cancelled');
+            $updated = $this->updateAppointmentStatus($appointment_id, 'cancelled');
+            if (!$updated) {
+                throw new Exception('Failed to update appointment status');
+            }
 
             // Add cancellation reason
-            $this->addReason($appointment_id, 'cancellation', $reason, $student_id);
+            $addedReason = $this->addReason($appointment_id, 'cancellation', $reason, $student_id);
+            if (!$addedReason) {
+                throw new Exception('Failed to add cancellation reason');
+            }
 
             $this->conn->commit();
             return true;

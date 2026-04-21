@@ -230,23 +230,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             require_once 'controller/OfficerAppointmentController.php';
             $controller = new OfficerAppointmentController();
 
-            switch ($action) {
-                case 'approve':
-                    $controller->approveAppointment();
-                    break;
-                case 'reject':
-                    $controller->rejectAppointment();
-                    break;
-                case 'reschedule':
-                    $controller->rescheduleAppointment();
-                    break;
-                case 'markInProgress':
-                    $controller->markInProgress();
-                    break;
-                case 'markCompleted':
-                    $controller->markCompleted();
-                    break;
-            }
+            
             exit;
     }
 }

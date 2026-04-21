@@ -24,12 +24,12 @@ $categories = $appointmentModel->getAllCategories();
 function getStatusBadgeColor($status)
 {
     $colors = [
-        'pending' => 'warning',
-        'approved' => 'info',
-        'in_progress' => 'primary',
-        'completed' => 'success',
-        'rejected' => 'danger',
-        'cancelled' => 'secondary',
+        'pending' => 'test1',
+        'approved' => 'test2',
+        'in_progress' => 'test3',
+        'completed' => 'test4',
+        'rejected' => 'test5',
+        'cancelled' => 'test6',
         'rescheduled' => 'info',
     ];
     return $colors[$status] ?? 'secondary';
@@ -172,7 +172,7 @@ function getStatusBadgeColor($status)
             <?php if ($counts): ?>
                 <div class="row mb-3">
                     <div class="col-md-2 mb-2">
-                        <div class="card text-center bg-warning text-white">
+                        <div class="card text-center bg-test1 text-white">
                             <div class="card-body py-2">
                                 <h5><?php echo (int) ($counts['pending_count'] ?? 0); ?></h5>
                                 <p class="mb-0 small">Pending</p>
@@ -180,7 +180,7 @@ function getStatusBadgeColor($status)
                         </div>
                     </div>
                     <div class="col-md-2 mb-2">
-                        <div class="card text-center bg-info text-white">
+                        <div class="card text-center bg-test2 text-white">
                             <div class="card-body py-2">
                                 <h5><?php echo (int) ($counts['approved_count'] ?? 0); ?></h5>
                                 <p class="mb-0 small">Approved</p>
@@ -188,7 +188,7 @@ function getStatusBadgeColor($status)
                         </div>
                     </div>
                     <div class="col-md-2 mb-2">
-                        <div class="card text-center bg-primary text-white">
+                        <div class="card text-center bg-test3 text-white">
                             <div class="card-body py-2">
                                 <h5><?php echo (int) ($counts['in_progress_count'] ?? 0); ?></h5>
                                 <p class="mb-0 small">In Progress</p>
@@ -196,7 +196,7 @@ function getStatusBadgeColor($status)
                         </div>
                     </div>
                     <div class="col-md-2 mb-2">
-                        <div class="card text-center bg-success text-white">
+                        <div class="card text-center bg-test4 text-white">
                             <div class="card-body py-2">
                                 <h5><?php echo (int) ($counts['completed_count'] ?? 0); ?></h5>
                                 <p class="mb-0 small">Completed</p>
@@ -204,7 +204,7 @@ function getStatusBadgeColor($status)
                         </div>
                     </div>
                     <div class="col-md-2 mb-2">
-                        <div class="card text-center bg-danger text-white">
+                        <div class="card text-center bg-test5 text-white">
                             <div class="card-body py-2">
                                 <h5><?php echo (int) ($counts['rejected_count'] ?? 0); ?></h5>
                                 <p class="mb-0 small">Rejected</p>
@@ -212,7 +212,7 @@ function getStatusBadgeColor($status)
                         </div>
                     </div>
                     <div class="col-md-2 mb-2">
-                        <div class="card text-center bg-secondary text-white">
+                        <div class="card text-center bg-test6 text-white">
                             <div class="card-body py-2">
                                 <h5><?php echo (int) ($counts['cancelled_count'] ?? 0); ?></h5>
                                 <p class="mb-0 small">Cancelled</p>
@@ -237,6 +237,7 @@ function getStatusBadgeColor($status)
                                         <th>Date &amp; Time</th>
                                         <th>Officer</th>
                                         <th>Status</th>
+                                        <th>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -257,12 +258,14 @@ function getStatusBadgeColor($status)
                                             <td>
                                                 <?php if (in_array($apt['status'], ['pending', 'approved'])): ?>
                                                     <button class="btn btn-sm btn-danger"
-                                                        onclick="confirmCancel(<?php echo (int) $apt['appointment_id']; ?>)">
+                                                        onclick="confirmCancel(event, <?php echo (int) $apt['appointment_id']; ?>)">
                                                         <i class="fas fa-ban"></i> Cancel
                                                     </button>
                                                 <?php endif; ?>
                                             </td>
                                         </tr>
+                                        
+
                                     <?php endforeach; ?>
                                 </tbody>
                             </table>
@@ -333,7 +336,7 @@ function getStatusBadgeColor($status)
 <div class="modal fade" id="studentDetailsModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
-            <div class="modal-header bg-primary text-white">
+            <div class="modal-header text-white">
                 <h5 class="modal-title"><i class="fas fa-calendar-alt"></i> Appointment Details</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
@@ -462,6 +465,7 @@ function getStatusBadgeColor($status)
                 }
                 const apt = data.data;
                 const statusColor = statusBadgeColor(apt.status);
+                const latestReason = apt.latest_reason || null;
 
                 let notesHtml = '';
                 if (apt.notes && apt.notes.length > 0) {
@@ -505,6 +509,14 @@ function getStatusBadgeColor($status)
                     <h6 class="text-muted">Description</h6>
                     <p>${escapeHtml(apt.description || '')}</p>
                 </div>
+                ${latestReason && latestReason.reason_text ? `
+                <div class="mb-3">
+                    <h6 class="text-muted">Latest Reason (${escapeHtml((latestReason.reason_type || '').replace('_', ' '))})</h6>
+                    <p class="mb-1">${escapeHtml(latestReason.reason_text)}</p>
+                    <small class="text-muted">
+                        <i class="fas fa-clock"></i> ${latestReason.created_at || ''}
+                    </small>
+                </div>` : ''}
                 <div class="row mb-3">
                     <div class="col-md-6">
                         <h6 class="text-muted">Scheduled Date</h6>
@@ -531,7 +543,11 @@ function getStatusBadgeColor($status)
     }
 
     // --- Cancel appointment ---
-    function confirmCancel(id) {
+    function confirmCancel(event, id) {
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
         document.getElementById('cancelAppointmentId').value = id;
         document.getElementById('cancelReason').value = '';
         new bootstrap.Modal(document.getElementById('cancelModal')).show();

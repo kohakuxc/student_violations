@@ -21,12 +21,12 @@ $categories        = $appointmentModel->getAllCategories();
 
 function getStatusBadgeColor($status) {
     $colors = [
-        'pending'    => 'warning',
-        'approved'   => 'info',
-        'in_progress'=> 'primary',
-        'completed'  => 'success',
-        'rejected'   => 'danger',
-        'cancelled'  => 'secondary',
+        'pending'    => 'test1',
+        'approved'   => 'test2',
+        'in_progress'=> 'test3',
+        'completed'  => 'test4',
+        'rejected'   => 'test5',
+        'cancelled'  => 'test6',
         'rescheduled'=> 'info'
     ];
     return $colors[$status] ?? 'secondary';
@@ -330,6 +330,7 @@ function viewAppointmentDetails(appointmentId) {
             }
             const apt = data.data;
             const statusColor = statusBadgeColor(apt.status);
+            const latestReason = apt.latest_reason || null;
 
             // Build notes HTML
             let notesHtml = '';
@@ -374,6 +375,14 @@ function viewAppointmentDetails(appointmentId) {
                     <h6 class="text-muted">Description</h6>
                     <p>${escapeHtml(apt.description || '')}</p>
                 </div>
+                ${latestReason && latestReason.reason_text ? `
+                <div class="mb-3">
+                    <h6 class="text-muted">Latest Reason (${escapeHtml((latestReason.reason_type || '').replace('_', ' '))})</h6>
+                    <p class="mb-1">${escapeHtml(latestReason.reason_text)}</p>
+                    <small class="text-muted">
+                        <i class="fas fa-clock"></i> ${latestReason.created_at || ''}
+                    </small>
+                </div>` : ''}
                 <div class="row mb-3">
                     <div class="col-md-6">
                         <h6 class="text-muted">Scheduled Date</h6>

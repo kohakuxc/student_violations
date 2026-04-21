@@ -47,6 +47,7 @@ try {
 
             $notes = $appointmentModel->getAppointmentNotes($appointment_id);
             $appointment['notes'] = $notes;
+            $appointment['latest_reason'] = $appointmentModel->getReasonByAppointmentId($appointment_id);
 
             echo json_encode(['success' => true, 'data' => $appointment]);
             break;
@@ -154,6 +155,9 @@ try {
             if (!$appointment_id) {
                 throw new Exception('Appointment ID required');
             }
+            if ($reason === '') {
+                throw new Exception('Cancellation reason is required');
+            }
 
             // Students can only cancel their own appointments
             if (isset($_SESSION['student_id'])) {
@@ -163,7 +167,18 @@ try {
                 }
             }
 
-            $appointmentModel->updateAppointmentStatus($appointment_id, 'cancelled');
+            $created_by = isset($_SESSION['student_id'])
+                ? (int) $_SESSION['student_id']
+                : (int) ($_SESSION['officer_id'] ?? 0);
+
+            if ($created_by <= 0) {
+                throw new Exception('Invalid user context for cancellation');
+            }
+
+            $ok = $appointmentModel->cancelAppointment($appointment_id, $reason, $created_by);
+            if (!$ok) {
+                throw new Exception('Failed to cancel appointment');
+            }
 
             echo json_encode(['success' => true, 'message' => 'Appointment cancelled']);
             break;

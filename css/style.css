@@ -539,7 +539,7 @@ textarea {
   padding: 1.5rem;
   border-radius: 8px;
   text-align: center;
-  color: white;
+  color: rgb(0, 0, 0);
 }
 
 .summary-card p {
