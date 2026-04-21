@@ -1,5 +1,7 @@
 <?php
 $pageTitle = $pageTitle ?? 'Student Portal';
+$styleVersion = @filemtime(__DIR__ . '/../../css/style.css') ?: time();
+$appointmentsStyleVersion = @filemtime(__DIR__ . '/../../css/appointments.css') ?: time();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -10,7 +12,7 @@ $pageTitle = $pageTitle ?? 'Student Portal';
     <title><?php echo htmlspecialchars($pageTitle); ?> - Student Violations System</title>
     
     <!-- Your custom CSS -->
-    <link rel="stylesheet" href="css/style.css" />
+    <link rel="stylesheet" href="css/style.css?v=<?php echo urlencode((string) $styleVersion); ?>" />
     
     <!-- Bootstrap CSS -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
@@ -19,7 +21,7 @@ $pageTitle = $pageTitle ?? 'Student Portal';
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <!-- Appointment System CSS -->
-    <link rel="stylesheet" href="css/appointments.css" />
+    <link rel="stylesheet" href="css/appointments.css?v=<?php echo urlencode((string) $appointmentsStyleVersion); ?>" />
 </head>
 
 <body>
