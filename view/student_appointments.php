@@ -175,7 +175,7 @@ function getStatusBadgeColor($status)
                         <div class="card text-center bg-test1 text-white">
                             <div class="card-body py-2">
                                 <h5><?php echo (int) ($counts['pending_count'] ?? 0); ?></h5>
-                                <p class="mb-0 small">Pending</p>
+                                <p class="mb-0 small" style="font-weight: bold;">Pending</p>
                             </div>
                         </div>
                     </div>
@@ -183,15 +183,15 @@ function getStatusBadgeColor($status)
                         <div class="card text-center bg-test2 text-white">
                             <div class="card-body py-2">
                                 <h5><?php echo (int) ($counts['approved_count'] ?? 0); ?></h5>
-                                <p class="mb-0 small">Approved</p>
+                                <p class="mb-0 small" style="font-weight: bold;">Approved</p>
                             </div>
                         </div>
                     </div>
                     <div class="col-md-2 mb-2">
                         <div class="card text-center bg-test3 text-white">
-                            <div class="card-body py-2">
+                            <div class="card-body py-2" >
                                 <h5><?php echo (int) ($counts['in_progress_count'] ?? 0); ?></h5>
-                                <p class="mb-0 small">In Progress</p>
+                                <p class="mb-0 small" style="font-weight: bold;">In Progress</p>
                             </div>
                         </div>
                     </div>
@@ -199,7 +199,7 @@ function getStatusBadgeColor($status)
                         <div class="card text-center bg-test4 text-white">
                             <div class="card-body py-2">
                                 <h5><?php echo (int) ($counts['completed_count'] ?? 0); ?></h5>
-                                <p class="mb-0 small">Completed</p>
+                                <p class="mb-0 small" style="font-weight: bold;">Completed</p>
                             </div>
                         </div>
                     </div>
@@ -207,7 +207,7 @@ function getStatusBadgeColor($status)
                         <div class="card text-center bg-test5 text-white">
                             <div class="card-body py-2">
                                 <h5><?php echo (int) ($counts['rejected_count'] ?? 0); ?></h5>
-                                <p class="mb-0 small">Rejected</p>
+                                <p class="mb-0 small" style="font-weight: bold;">Rejected</p>
                             </div>
                         </div>
                     </div>
@@ -215,7 +215,7 @@ function getStatusBadgeColor($status)
                         <div class="card text-center bg-test6 text-white">
                             <div class="card-body py-2">
                                 <h5><?php echo (int) ($counts['cancelled_count'] ?? 0); ?></h5>
-                                <p class="mb-0 small">Cancelled</p>
+                                <p class="mb-0 small" style="font-weight: bold;">Cancelled</p>
                             </div>
                         </div>
                     </div>

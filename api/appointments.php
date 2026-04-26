@@ -10,9 +10,11 @@ if (!isset($_SESSION['student_id']) && !isset($_SESSION['officer_id'])) {
 
 require_once __DIR__ . '/../config/db_connection.php';
 require_once __DIR__ . '/../model/AppointmentModel.php';
+require_once __DIR__ . '/../config/system_settings.php';
 
 $action = $_GET['action'] ?? null;
 $appointmentModel = new AppointmentModel();
+$settings = loadSystemSettings();
 
 try {
     switch ($action) {
@@ -30,7 +32,7 @@ try {
             if (!$date || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
                 throw new Exception('Valid date required');
             }
-            $slots = $appointmentModel->getAvailableTimeSlots(1, $date);
+            $slots = $appointmentModel->getAvailableTimeSlots((int) ($settings['default_officer_id'] ?? 1), $date);
             echo json_encode(['success' => true, 'data' => $slots]);
             break;
 
@@ -72,6 +74,9 @@ try {
                 $appointmentModel->addAppointmentNote($appointment_id, $note_text, $officer_id);
             }
 
+            // Create appointment approved notification
+            $appointmentModel->createAppointmentNotification($appointment_id, 'approved', $officer_id, $_SESSION['officer_name'] ?? 'Staff');
+
             echo json_encode(['success' => true, 'message' => 'Appointment approved successfully']);
             break;
 
@@ -92,6 +97,9 @@ try {
             }
 
             $appointmentModel->rejectAppointment($appointment_id, $reason, $officer_id);
+
+            // Create appointment rejected notification
+            $appointmentModel->createAppointmentNotification($appointment_id, 'rejected', $officer_id, $_SESSION['officer_name'] ?? 'Staff');
 
             echo json_encode(['success' => true, 'message' => 'Appointment rejected']);
             break;
@@ -130,7 +138,7 @@ try {
             $note_text = trim($data['note'] ?? $_POST['note'] ?? '');
             $officer_id = (int) $_SESSION['officer_id'];
 
-            $allowed_statuses = ['pending', 'approved', 'in_progress', 'completed', 'rejected', 'cancelled'];
+            $allowed_statuses = ['pending', 'approved', 'in_progress', 'completed', 'rejected', 'cancelled', 'rescheduled'];
             if (!$appointment_id) {
                 throw new Exception('Appointment ID required');
             }
@@ -142,6 +150,11 @@ try {
 
             if ($note_text !== '') {
                 $appointmentModel->addAppointmentNote($appointment_id, $note_text, $officer_id);
+            }
+
+            // Create student notification for appointment response statuses
+            if (in_array($status, ['pending', 'approved', 'rejected', 'completed', 'cancelled', 'rescheduled'])) {
+                $appointmentModel->createAppointmentNotification($appointment_id, $status, $officer_id, $_SESSION['officer_name'] ?? 'Staff');
             }
 
             echo json_encode(['success' => true, 'message' => 'Status updated successfully']);
@@ -178,6 +191,11 @@ try {
             $ok = $appointmentModel->cancelAppointment($appointment_id, $reason, $created_by);
             if (!$ok) {
                 throw new Exception('Failed to cancel appointment');
+            }
+
+            // If officer cancels an appointment, notify student
+            if (isset($_SESSION['officer_id'])) {
+                $appointmentModel->createAppointmentNotification($appointment_id, 'cancelled', (int) $_SESSION['officer_id'], $_SESSION['officer_name'] ?? 'Staff');
             }
 
             echo json_encode(['success' => true, 'message' => 'Appointment cancelled']);

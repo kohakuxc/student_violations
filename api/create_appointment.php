@@ -4,6 +4,9 @@ header('Content-Type: application/json');
 
 require_once __DIR__ . '/../config/env_loader.php';
 loadEnvFile(__DIR__ . '/../config/.env');
+require_once __DIR__ . '/../config/system_settings.php';
+
+$settings = loadSystemSettings();
 
 $isProduction = strtolower(trim(getenv('APP_ENV') ?: 'development')) === 'production';
 
@@ -63,8 +66,8 @@ try {
     if (!empty($_FILES['evidence_image']['name'])) {
         debug_log("File upload attempted");
         $file = $_FILES['evidence_image'];
-        $allowed_types = ['image/jpeg', 'image/jpg', 'application/pdf'];
-        $max_size = 3 * 1024 * 1024;
+        $allowed_types = $settings['allowed_file_types'] ?? ['image/jpeg', 'image/jpg', 'application/pdf'];
+        $max_size = ((int) ($settings['max_file_size_mb'] ?? 3)) * 1024 * 1024;
         
         if (!in_array($file['type'], $allowed_types)) {
             debug_log("ERROR: Invalid file type - {$file['type']}", true);

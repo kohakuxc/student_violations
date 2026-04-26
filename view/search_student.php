@@ -17,7 +17,48 @@ include 'view/partials/layout_top.php'; ?>
     <button type="submit" class="btn btn-primary">Search</button>
   </form>
 
-<script src="assets/js/student_lookup.js"></script>
+  <script src="assets/js/student_lookup.js"></script>
+
+  <style>
+    .escalation-panel {
+      margin-top: 24px;
+      background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%);
+      padding: 1.5rem;
+      border-radius: 8px;
+      margin-bottom: 2rem;
+      border-left: 4px solid #667eea;
+    }
+
+    .escalation-item {
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 0.85rem;
+      margin-bottom: 0.8rem;
+      background: #f9fafb;
+    }
+
+    .escalation-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .source-list {
+      margin: 0.35rem 0 0 1.1rem;
+    }
+
+    .source-list li {
+      margin-bottom: 0.3rem;
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: #dbeafe;
+      color: #1e3a8a;
+      font-size: 12px;
+      font-weight: 600;
+    }
+  </style>
 
   <?php if ($search_performed && $student_info): ?>
     <div class="student-info">
@@ -52,10 +93,11 @@ include 'view/partials/layout_top.php'; ?>
         </div>
       </div>
     <?php endif; ?>
+
     
-    <h3>Violations History</h3>
 
     <div class="violations-list">
+      <h3>Violations History</h3>
       <?php if (!empty($violations)): ?>
         <table class="violations-table">
           <thead>
@@ -88,6 +130,37 @@ include 'view/partials/layout_top.php'; ?>
         </table>
       <?php else: ?>
         <div class="alert alert-info">ℹ️ No violations found for this student.</div>
+      <?php endif; ?>
+    </div>
+
+    <div class="escalation-panel">
+      <h3>Escalation History</h3>
+      <p class="muted">3 minor offenses are auto-converted into 1 Major Offense - Category A.</p>
+
+      <?php if (empty($escalation_history ?? [])): ?>
+        <div class="alert alert-info">ℹ️ No escalation events for this student.</div>
+      <?php else: ?>
+        <?php foreach (($escalation_history ?? []) as $e): ?>
+          <div class="escalation-item">
+            <div><span class="pill">Escalation #<?php echo (int) $e['escalation_id']; ?></span></div>
+            <p><strong>Created:</strong> <?php echo htmlspecialchars(date('M d, Y h:i A', strtotime($e['escalated_at']))); ?>
+            </p>
+            <p><strong>Major Record:</strong> #<?php echo (int) $e['major_violation_id']; ?>
+              (<?php echo htmlspecialchars(date('M d, Y', strtotime($e['major_date_of_violation']))); ?>)</p>
+            <p><strong>Recorded By:</strong> <?php echo htmlspecialchars($e['escalated_by_officer'] ?? 'System'); ?></p>
+
+            <p><strong>Source Minor Violations:</strong></p>
+            <ul class="source-list">
+              <?php foreach (($e['source_violations'] ?? []) as $src): ?>
+                <li>
+                  #<?php echo (int) $src['source_violation_id']; ?>
+                  (<?php echo htmlspecialchars(date('M d, Y', strtotime($src['date_of_violation']))); ?>)
+                  - <?php echo htmlspecialchars($src['description'] ?? ''); ?>
+                </li>
+              <?php endforeach; ?>
+            </ul>
+          </div>
+        <?php endforeach; ?>
       <?php endif; ?>
     </div>
 

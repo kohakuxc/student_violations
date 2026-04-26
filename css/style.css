@@ -23,7 +23,7 @@ body {
 
 /* Topbar stays fixed */
 .topbar {
-  background: #0B5793;
+  background: #0b5793;
   color: white;
   display: flex;
   align-items: center;
@@ -257,7 +257,7 @@ textarea {
 }
 
 .btn-primary {
-  background: #0B5793;
+  background: #0b5793;
   color: white;
 }
 
@@ -527,6 +527,11 @@ textarea {
 /* ===== VIOLATION SUMMARY ===== */
 .violation-summary {
   margin-bottom: 2rem;
+  background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%);
+  padding: 1.5rem;
+  border-radius: 8px;
+  margin-bottom: 2rem;
+  border-left: 4px solid #667eea;
 }
 
 .summary-grid {
@@ -555,6 +560,11 @@ textarea {
 /* ===== VIOLATIONS TABLE ===== */
 .violations-list {
   overflow-x: auto;
+  background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%);
+  padding: 1.5rem;
+  border-radius: 8px;
+  margin-bottom: 2rem;
+  border-left: 4px solid #667eea;
 }
 
 .violations-table {
@@ -739,4 +749,56 @@ textarea {
 
 .sidebar-link.active:hover {
   background: rgba(102, 126, 234, 0.3);
+}
+
+/* ===== TOOLTIP FOR HELP ===== */
+.helptooltip {
+  position: relative;
+  display: inline-block;
+  cursor: pointer;
+  font-family: "Arial", sans-serif;
+}
+
+.helptooltip:hover .helptooltiptext {
+  visibility: visible;
+  opacity: 1;
+}
+
+.helptooltiptext {
+  visibility: hidden;
+  width: 200px;
+  background-color: #333;
+  color: #fff;
+  text-align: center;
+  border-radius: 5px;
+  padding: 10px;
+  position: absolute;
+  z-index: 1;
+  bottom: 145%;
+  left: 50%;
+  margin-left: -100px;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.helptooltiptext::after {
+  content: "";
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  margin-left: -10px;
+  border-width: 10px;
+  border-style: solid;
+  border-color: transparent transparent #333333 transparent;
+}
+
+.helptooltip .icon {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  background-color: #4c77af;
+  color: #fff;
+  border-radius: 50%;
+  text-align: center;
+  line-height: 20px;
 }

@@ -21,6 +21,7 @@ $violationModel = new ViolationModel();
 $violations = [];
 $student_info = null;
 $violation_counts = [];
+$escalation_history = [];
 $search_performed = false;
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST' || isset($_GET['search'])) {
@@ -40,6 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' || isset($_GET['search'])) {
             // Get violations for this student
             $violations = $violationModel->getViolationsByStudent($student_info['student_id']);
             $violation_counts = $violationModel->getViolationCountByType($student_info['student_id']);
+            $escalation_history = $violationModel->getEscalationHistory($student_info['student_id']);
         }
     }
 }

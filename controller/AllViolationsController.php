@@ -13,6 +13,7 @@ include 'model/ViolationModel.php';
 
 $violationModel = new ViolationModel();
 $violations = $violationModel->getAllViolations();
+$escalation_history = $violationModel->getEscalationHistory();
 
 include 'view/all_violations.php';
 ?>
