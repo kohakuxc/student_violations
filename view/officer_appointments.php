@@ -2,6 +2,7 @@
 include __DIR__ . '/partials/layout_top.php';
 require_once __DIR__ . '/../config/db_connection.php';
 require_once __DIR__ . '/../model/AppointmentModel.php';
+require_once __DIR__ . '/../config/system_settings.php';
 
 if (!isset($_SESSION['officer_id'])) {
     header('Location: index.php?page=login');
@@ -9,13 +10,26 @@ if (!isset($_SESSION['officer_id'])) {
 }
 
 $appointmentModel = new AppointmentModel();
+$settings = loadSystemSettings();
 
 $category_id = $_GET['category'] ?? null;
 $status      = $_GET['status'] ?? null;
 $search      = trim($_GET['search'] ?? '');
+$sort        = $_GET['sort'] ?? ($settings['officer_default_sort'] ?? 'scheduled_date_desc');
+
+$allowedSortValues = ['scheduled_date_desc', 'scheduled_date_asc', 'created_at_desc'];
+if (!in_array($sort, $allowedSortValues, true)) {
+    $sort = $settings['officer_default_sort'] ?? 'scheduled_date_desc';
+}
+
+$perPage = max(1, (int) ($settings['dashboard_page_size'] ?? 10));
+$page = max(1, (int) ($_GET['p'] ?? 1));
+$offset = ($page - 1) * $perPage;
 
 // Get appointments with search support
-$appointments_data = $appointmentModel->getAllAppointments($category_id, $status, $search ?: null);
+$appointments_data = $appointmentModel->getAllAppointments($category_id, $status, $search ?: null, $sort, $perPage, $offset);
+$appointments_total = count($appointmentModel->getAllAppointments($category_id, $status, $search ?: null, $sort));
+$totalPages = max(1, (int) ceil($appointments_total / $perPage));
 $stats             = $appointmentModel->getAppointmentStats();
 $categories        = $appointmentModel->getAllCategories();
 
@@ -83,14 +97,14 @@ function getStatusBadgeColor($status) {
         </div>
         <div class="card-body">
             <!-- Filters -->
-            <form method="GET" action="index.php" class="row g-2 mb-4">
+            <form method="GET" action="index.php" class="row g-2 mb-4 align-items-end">
                 <input type="hidden" name="page" value="officer_appointments">
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <input type="text" class="form-control" name="search"
                            placeholder="Search by student ID or description"
                            value="<?php echo htmlspecialchars($search); ?>">
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <select class="form-select" name="category">
                         <option value="">All Categories</option>
                         <?php foreach ($categories as $cat): ?>
@@ -101,7 +115,7 @@ function getStatusBadgeColor($status) {
                         <?php endforeach; ?>
                     </select>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <select class="form-select" name="status">
                         <option value="">All Statuses</option>
                         <option value="pending"     <?php echo ($status === 'pending')     ? 'selected' : ''; ?>>Pending</option>
@@ -112,9 +126,16 @@ function getStatusBadgeColor($status) {
                         <option value="cancelled"   <?php echo ($status === 'cancelled')   ? 'selected' : ''; ?>>Cancelled</option>
                     </select>
                 </div>
-                <div class="col-md-2 d-flex gap-1 align-items-stretch">
-                    <button type="submit" class="btn btn-primary flex-fill h-100">Filter</button>
-                    <a href="index.php?page=officer_appointments" class="btn btn-secondary flex-fill h-100 d-flex align-items-center justify-content-center">Reset</a>
+                <div class="col-md-2">
+                    <select class="form-select" name="sort">
+                        <option value="scheduled_date_desc" <?php echo ($sort === 'scheduled_date_desc') ? 'selected' : ''; ?>>Newest Schedule</option>
+                        <option value="scheduled_date_asc" <?php echo ($sort === 'scheduled_date_asc') ? 'selected' : ''; ?>>Oldest Schedule</option>
+                        <option value="created_at_desc" <?php echo ($sort === 'created_at_desc') ? 'selected' : ''; ?>>Recently Created</option>
+                    </select>
+                </div>
+                <div class="col-md-3 d-flex gap-2" style="height: 45px;">
+                    <button type="submit" class="btn btn-primary w-100">Filter</button>
+                    <a href="index.php?page=officer_appointments" class="btn btn-secondary w-100 d-flex align-items-center justify-content-center">Reset</a>
                 </div>
             </form>
 
@@ -128,8 +149,8 @@ function getStatusBadgeColor($status) {
                     <table class="table table-hover">
                         <thead class="table-light">
                             <tr>
-                                <th>Student ID</th>
-                                <th>Category</th>
+                                <th>Student Name</th>
+                                <th>Category Name</th>
                                 <th>Description</th>
                                 <th>Scheduled Date</th>
                                 <th>Assigned Officer</th>
@@ -140,8 +161,8 @@ function getStatusBadgeColor($status) {
                             <?php foreach ($appointments_data as $apt): ?>
                                 <tr style="cursor: pointer;"
                                     onclick="viewAppointmentDetails(<?php echo (int) $apt['appointment_id']; ?>)">
-                                    <td><strong><?php echo htmlspecialchars($apt['student_id']); ?></strong></td>
-                                    <td><?php echo htmlspecialchars($apt['category_id'] ?? 'N/A'); ?></td>
+                                    <td><strong><?php echo htmlspecialchars($apt['student_name'] ?? (string) $apt['student_id']); ?></strong></td>
+                                    <td><?php echo htmlspecialchars($apt['category_name'] ?? 'N/A'); ?></td>
                                     <td><?php echo htmlspecialchars(substr($apt['description'] ?? '', 0, 50)); ?></td>
                                     <td><?php echo date('M d, Y - h:i A', strtotime($apt['scheduled_date'])); ?></td>
                                     <td><?php echo htmlspecialchars($apt['officer_name'] ?? '—'); ?></td>
@@ -154,6 +175,57 @@ function getStatusBadgeColor($status) {
                             <?php endforeach; ?>
                         </tbody>
                     </table>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center mt-3">
+                    <small class="text-muted">
+                        Showing page <?php echo (int) $page; ?> of <?php echo (int) $totalPages; ?>
+                        (<?php echo (int) $appointments_total; ?> total)
+                    </small>
+                    <div class="d-flex gap-2 flex-wrap align-items-center justify-content-end">
+                        <?php
+                        $queryBase = [
+                            'page' => 'officer_appointments',
+                            'search' => $search,
+                            'category' => $category_id,
+                            'status' => $status,
+                            'sort' => $sort,
+                        ];
+
+                        $pageStart = max(1, $page - 2);
+                        $pageEnd = min((int) $totalPages, $page + 2);
+                        ?>
+                        <?php if ($page > 1): ?>
+                            <?php $prev = $queryBase; $prev['p'] = $page - 1; ?>
+                            <a class="btn btn-sm btn-outline-secondary" href="index.php?<?php echo htmlspecialchars(http_build_query($prev)); ?>">Previous</a>
+                        <?php endif; ?>
+
+                        <?php if ($pageStart > 1): ?>
+                            <?php $first = $queryBase; $first['p'] = 1; ?>
+                            <a class="btn btn-sm btn-outline-secondary" href="index.php?<?php echo htmlspecialchars(http_build_query($first)); ?>">1</a>
+                            <?php if ($pageStart > 2): ?>
+                                <span class="text-muted">...</span>
+                            <?php endif; ?>
+                        <?php endif; ?>
+
+                        <?php for ($p = $pageStart; $p <= $pageEnd; $p++): ?>
+                            <?php $num = $queryBase; $num['p'] = $p; ?>
+                            <a class="btn btn-sm <?php echo $p === (int) $page ? 'btn-primary' : 'btn-outline-secondary'; ?>" href="index.php?<?php echo htmlspecialchars(http_build_query($num)); ?>"><?php echo (int) $p; ?></a>
+                        <?php endfor; ?>
+
+                        <?php if ($pageEnd < (int) $totalPages): ?>
+                            <?php if ($pageEnd < ((int) $totalPages - 1)): ?>
+                                <span class="text-muted">...</span>
+                            <?php endif; ?>
+                            <?php $last = $queryBase; $last['p'] = (int) $totalPages; ?>
+                            <a class="btn btn-sm btn-outline-secondary" href="index.php?<?php echo htmlspecialchars(http_build_query($last)); ?>"><?php echo (int) $totalPages; ?></a>
+                        <?php endif; ?>
+
+                        <?php if ($page < $totalPages): ?>
+                            <?php $next = $queryBase; $next['p'] = $page + 1; ?>
+                            <a class="btn btn-sm btn-outline-secondary" href="index.php?<?php echo htmlspecialchars(http_build_query($next)); ?>">Next</a>
+                        <?php endif; ?>
+                    </div>
                 </div>
             <?php endif; ?>
         </div>
@@ -353,8 +425,8 @@ function viewAppointmentDetails(appointmentId) {
             contentDiv.innerHTML = `
                 <div class="row mb-3">
                     <div class="col-md-6">
-                        <h6 class="text-muted">Student ID</h6>
-                        <p><strong>${escapeHtml(String(apt.student_id))}</strong></p>
+                        <h6 class="text-muted">Student Name</h6>
+                        <p><strong>${escapeHtml(String(apt.student_name || apt.student_id || 'N/A'))}</strong></p>
                     </div>
                     <div class="col-md-6">
                         <h6 class="text-muted">Status</h6>
@@ -363,12 +435,12 @@ function viewAppointmentDetails(appointmentId) {
                 </div>
                 <div class="row mb-3">
                     <div class="col-md-6">
-                        <h6 class="text-muted">Category</h6>
-                        <p>${escapeHtml(String(apt.category_id))}</p>
+                        <h6 class="text-muted">Category Name</h6>
+                        <p>${escapeHtml(String(apt.category_name || apt.category_id || 'N/A'))}</p>
                     </div>
                     <div class="col-md-6">
                         <h6 class="text-muted">Type</h6>
-                        <p>${escapeHtml(String(apt.subcategory_id))}</p>
+                        <p>${escapeHtml(String(apt.subcategory_name || apt.subcategory_id || 'N/A'))}</p>
                     </div>
                 </div>
                 <div class="mb-3">
@@ -567,6 +639,23 @@ function showToast(message, type) {
     container.appendChild(toast);
     setTimeout(() => toast.remove(), 4000);
 }
+
+// If opened from a notification link, automatically open the appointment details modal.
+document.addEventListener('DOMContentLoaded', function () {
+    const url = new URL(window.location.href);
+    const appointmentId = url.searchParams.get('appointment_id');
+
+    if (!appointmentId) {
+        return;
+    }
+
+    const parsed = Number(appointmentId);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+        return;
+    }
+
+    viewAppointmentDetails(parsed);
+});
 </script>
 
 </body>

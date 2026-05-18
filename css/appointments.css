@@ -219,42 +219,6 @@
 }
 
 
-.badge.bg-pending,
-.badge.bg-warning {
-    background-color: #392648;
-    color: white;
-}
-
-.badge.bg-approved,
-.badge.bg-info {
-    background-color: #4D3763 !important;
-    color: white;
-}
-
-.badge.bg-in_progress,
-.badge.bg-purple {
-    background-color: #624B78 !important;
-    color: white;
-}
-
-.badge.bg-completed,
-.badge.bg-success {
-    background-color: #7E479C !important;
-    color: white;
-}
-
-.badge.bg-rejected,
-.badge.bg-danger {
-    background-color: #8F709A !important;
-    color: white;
-}
-
-.badge.bg-cancelled,
-.badge.bg-secondary {
-    background-color: #366897 !important;
-    color: white;
-}
-
 .badge.bg-rescheduled,
 .badge.bg-cyan {
     background-color: #17a2b8 !important;

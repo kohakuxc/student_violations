@@ -290,6 +290,15 @@ class StudentAuthModel
         return $this->driverName() === 'pgsql';
     }
 
+    private function isEscalatedFalseCondition($alias = 'v')
+    {
+        if ($this->isPgsql()) {
+            return "COALESCE({$alias}.is_escalated, FALSE) = FALSE";
+        }
+
+        return "ISNULL({$alias}.is_escalated, 0) = 0";
+    }
+
     private function getStudentInfoTableColumns()
     {
         if ($this->studentInfoTableColumns !== null) {
@@ -816,6 +825,7 @@ class StudentAuthModel
                       JOIN officers o ON v.officer_id = o.officer_id
                       LEFT JOIN violation_types vt ON v.violation_type = vt.violation_type_id
                       WHERE v.student_id = ?
+                        AND " . $this->isEscalatedFalseCondition('v') . "
                       ORDER BY v.date_of_violation DESC";
 
             $stmt = $this->conn->prepare($query);
@@ -840,6 +850,7 @@ class StudentAuthModel
                 FROM violations v
                 LEFT JOIN violation_types vt ON vt.violation_type_id = v.violation_type
                 WHERE v.student_id = ?
+                  AND " . $this->isEscalatedFalseCondition('v') . "
                 GROUP BY vt.severity_level
                 ORDER BY
                     CASE vt.severity_level

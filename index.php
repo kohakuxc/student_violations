@@ -110,6 +110,14 @@ switch ($page) {
         include 'controller/AllViolationsController.php';
         break;
 
+    case 'settings':
+        if (!isset($_SESSION['officer_id'])) {
+            header("Location: index.php?page=login");
+            exit();
+        }
+        include 'controller/SettingsController.php';
+        break;
+
     // ===== NEW APPOINTMENT ROUTES =====
     case 'student_appointments':
         // Student appointments - check if logged in
@@ -145,6 +153,14 @@ switch ($page) {
             exit();
         }
         include 'controller/AppointmentsController.php';
+        break;
+
+    case 'messages':
+        if (!isset($_SESSION['officer_id']) && !isset($_SESSION['student_id'])) {
+            header("Location: index.php?page=login");
+            exit();
+        }
+        include 'view/messages.php';
         break;
 
     // ===== STUDENT ROUTES =====

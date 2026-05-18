@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../model/AppointmentModel.php';
 require_once __DIR__ . '/../model/StudentModel.php';
 require_once __DIR__ . '/../helper/EmailNotification.php';
+require_once __DIR__ . '/../config/system_settings.php';
 
 class StudentAppointmentController
 {
@@ -53,7 +54,8 @@ class StudentAppointmentController
         header('Content-Type: application/json');
         try {
             $date = $_GET['date'] ?? null;
-            $officer_id = 1; // Assuming only one officer
+            $settings = loadSystemSettings();
+            $officer_id = (int) ($settings['default_officer_id'] ?? 1);
 
             if (!$date || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
                 throw new Exception('Valid date is required (YYYY-MM-DD)');
@@ -159,6 +161,12 @@ class StudentAppointmentController
                 throw new Exception('Failed to create appointment');
             }
 
+            // Create notifications:
+            // - Student: appointment pending response
+            // - Officer: new appointment request
+            $this->appointmentModel->createAppointmentNotification($appointment_id, 'pending', $officer_id, 'Staff');
+            $this->appointmentModel->createAppointmentNotification($appointment_id, 'request', $officer_id, 'Staff');
+
             // Get appointment details for email
             $appointment = $this->appointmentModel->getAppointmentById($appointment_id);
             $student = $this->studentModel->getStudentByIdForAppointments($student_id);
@@ -179,8 +187,9 @@ class StudentAppointmentController
     private function handleFileUpload($file)
     {
         try {
-            $allowed_types = ['application/pdf', 'image/jpeg', 'image/jpg'];
-            $max_size = 3 * 1024 * 1024; // 3MB
+            $settings = loadSystemSettings();
+            $allowed_types = $settings['allowed_file_types'] ?? ['application/pdf', 'image/jpeg', 'image/jpg'];
+            $max_size = ((int) ($settings['max_file_size_mb'] ?? 3)) * 1024 * 1024;
 
             // Validate file
             if ($file['size'] > $max_size) {
@@ -301,16 +310,12 @@ class StudentAppointmentController
             exit;
         }
 
-        $slots = [
-            ['time' => '8:00 AM'],
-            ['time' => '9:00 AM'],
-            ['time' => '10:00 AM'],
-            ['time' => '11:00 AM'],
-            ['time' => '1:00 PM'],
-            ['time' => '2:00 PM'],
-            ['time' => '3:00 PM'],
-            ['time' => '4:00 PM']
-        ];
+        $settings = loadSystemSettings();
+        $appointmentModel = new AppointmentModel();
+        $slots = $appointmentModel->getAvailableTimeSlots((int) ($settings['default_officer_id'] ?? 1), $date);
+        $slots = array_map(static function ($time) {
+            return ['time' => $time];
+        }, $slots);
 
         header('Content-Type: application/json');
         echo json_encode(['success' => true, 'data' => $slots]);

@@ -11,7 +11,7 @@ class StudentModel
 
     public function __construct()
     {
-        include 'config/db_connection.php';
+        include __DIR__ . '/../config/db_connection.php';
         $this->conn = $conn;
     }
 

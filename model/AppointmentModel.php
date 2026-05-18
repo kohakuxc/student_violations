@@ -5,6 +5,24 @@ class AppointmentModel
 {
     private $conn;
 
+    private function loadSettings()
+    {
+        require_once __DIR__ . '/../config/system_settings.php';
+        return loadSystemSettings();
+    }
+
+    private function getDefaultOfficerId()
+    {
+        $settings = $this->loadSettings();
+        return (int) ($settings['default_officer_id'] ?? (getenv('DEFAULT_OFFICER_ID') ?: 1));
+    }
+
+    private function pdoErrorMessage()
+    {
+        $errorInfo = $this->conn->errorInfo();
+        return $errorInfo[2] ?? 'Unknown database error';
+    }
+
     private function driverName()
     {
         return $this->conn->getAttribute(PDO::ATTR_DRIVER_NAME);
@@ -89,13 +107,13 @@ class AppointmentModel
             $stmt = $this->conn->prepare($query);
 
             if (!$stmt) {
-                $error = $this->conn->error;
+                $error = $this->pdoErrorMessage();
                 $log("PREPARE ERROR: $error", true);
                 return false;
             }
 
             $status = 'pending';
-            $officer_id = (int) (getenv('DEFAULT_OFFICER_ID') ?: 1);
+            $officer_id = $this->getDefaultOfficerId();
             $result = $stmt->execute([
                 (int) $student_id,
                 (int) $officer_id,
@@ -197,46 +215,87 @@ class AppointmentModel
         }
     }
 
-    public function getAllAppointments($category_id = null, $status = null, $search = null) {
-    try {
-        $query = "SELECT a.*, o.name as officer_name
-              FROM appointments a
-              LEFT JOIN officers o ON a.officer_id = o.officer_id
-                  WHERE 1=1";
-        $params = [];
+    public function getAllAppointments($category_id = null, $status = null, $search = null, $sort = 'scheduled_date_desc', $limit = null, $offset = null)
+    {
+        try {
+            $query = "SELECT a.*, 
+                             o.name as officer_name,
+                             c.category_name,
+                             COALESCE(NULLIF(LTRIM(RTRIM(CONCAT(COALESCE(si.last_name, ''), ', ', COALESCE(si.first_name, '')))), ','), CAST(a.student_id AS VARCHAR(50))) AS student_name
+                      FROM appointments a
+                      LEFT JOIN officers o ON a.officer_id = o.officer_id
+                      LEFT JOIN appointment_categories c ON a.category_id = c.category_id
+                      LEFT JOIN students st ON a.student_id = st.student_id
+                      LEFT JOIN student_information si ON st.student_id = si.student_id
+                      WHERE 1=1";
+            $params = [];
 
-        if ($category_id) {
-            $query .= " AND a.category_id = ?";
-            $params[] = (int) $category_id;
-        }
-
-        if ($status) {
-            $query .= " AND a.status = ?";
-            $params[] = $status;
-        }
-
-        if ($search) {
-            if ($this->isPgsql()) {
-                $query .= " AND (CAST(a.student_id AS TEXT) LIKE ? OR a.description LIKE ?)";
-            } else {
-                $query .= " AND (CAST(a.student_id AS NVARCHAR(50)) LIKE ? OR a.description LIKE ?)";
+            if ($category_id) {
+                $query .= " AND a.category_id = ?";
+                $params[] = (int) $category_id;
             }
-            $params[] = '%' . $search . '%';
-            $params[] = '%' . $search . '%';
+
+            if ($status) {
+                $query .= " AND a.status = ?";
+                $params[] = $status;
+            }
+
+            if ($search) {
+                if ($this->isPgsql()) {
+                    $query .= " AND (
+                                    CAST(a.student_id AS TEXT) LIKE ?
+                                    OR a.description LIKE ?
+                                    OR CONCAT(COALESCE(si.first_name, ''), ' ', COALESCE(si.last_name, '')) ILIKE ?
+                                    OR CONCAT(COALESCE(si.last_name, ''), ', ', COALESCE(si.first_name, '')) ILIKE ?
+                                )";
+                } else {
+                    $query .= " AND (
+                                    CAST(a.student_id AS NVARCHAR(50)) LIKE ?
+                                    OR a.description LIKE ?
+                                    OR CONCAT(COALESCE(si.first_name, ''), ' ', COALESCE(si.last_name, '')) LIKE ?
+                                    OR CONCAT(COALESCE(si.last_name, ''), ', ', COALESCE(si.first_name, '')) LIKE ?
+                                )";
+                }
+                $params[] = '%' . $search . '%';
+                $params[] = '%' . $search . '%';
+                $params[] = '%' . $search . '%';
+                $params[] = '%' . $search . '%';
+            }
+
+            $orderBy = "a.scheduled_date DESC";
+            if ($sort === 'scheduled_date_asc') {
+                $orderBy = "a.scheduled_date ASC";
+            } elseif ($sort === 'created_at_desc') {
+                $orderBy = "a.created_at DESC";
+            }
+
+            $query .= " ORDER BY " . $orderBy;
+
+            if ($limit !== null) {
+                $limit = max(1, (int) $limit);
+                $offset = max(0, (int) ($offset ?? 0));
+
+                if ($this->isPgsql()) {
+                    $query .= " LIMIT ? OFFSET ?";
+                    $params[] = $limit;
+                    $params[] = $offset;
+                } else {
+                    $query .= " OFFSET ? ROWS FETCH NEXT ? ROWS ONLY";
+                    $params[] = $offset;
+                    $params[] = $limit;
+                }
+            }
+
+            $stmt = $this->conn->prepare($query);
+            $stmt->execute($params);
+
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        } catch (Exception $e) {
+            error_log("Exception in getAllAppointments: " . $e->getMessage());
+            return [];
         }
-
-        $query .= " ORDER BY a.scheduled_date DESC";
-
-        $stmt = $this->conn->prepare($query);
-        $stmt->execute($params);
-
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-    } catch (Exception $e) {
-        error_log("Exception in getAllAppointments: " . $e->getMessage());
-        return [];
     }
-}
 
     // Get student's appointments (with optional status filter, LEFT JOIN for officer)
     public function getStudentAppointments($student_id, $status = null)
@@ -360,7 +419,7 @@ class AppointmentModel
 
             $stmt = $this->conn->prepare($query);
             if (!$stmt) {
-                throw new Exception("Prepare failed: " . $this->conn->error);
+                throw new Exception("Prepare failed: " . $this->pdoErrorMessage());
             }
 
             $stmt->execute($params);
@@ -447,7 +506,7 @@ class AppointmentModel
 
             $stmt = $this->conn->prepare($query);
             if (!$stmt) {
-                throw new Exception("Prepare failed: " . $this->conn->error);
+                throw new Exception("Prepare failed: " . $this->pdoErrorMessage());
             }
 
             $stmt->execute([$officer_id, $officer_id, $officer_id]);
@@ -473,22 +532,30 @@ class AppointmentModel
     public function getAppointmentById($appointment_id) {
     try {
         $stmt = $this->conn->prepare("
-            SELECT a.*, o.name as officer_name
+            SELECT a.*, 
+                   o.name as officer_name,
+                   c.category_name,
+                   s.subcategory_name,
+                   COALESCE(NULLIF(LTRIM(RTRIM(CONCAT(COALESCE(si.last_name, ''), ', ', COALESCE(si.first_name, '')))), ','), CAST(a.student_id AS VARCHAR(50))) AS student_name
             FROM appointments a
             LEFT JOIN officers o ON a.officer_id = o.officer_id
+            LEFT JOIN appointment_categories c ON a.category_id = c.category_id
+            LEFT JOIN appointment_subcategories s ON a.subcategory_id = s.subcategory_id
+            LEFT JOIN students st ON a.student_id = st.student_id
+            LEFT JOIN student_information si ON st.student_id = si.student_id
             WHERE a.appointment_id = ?
         ");
         $stmt->execute([$appointment_id]);
-        
+
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
-        
+
         if (!$result) {
             error_log("Appointment not found: ID = " . $appointment_id);
             return null;
         }
-        
+
         return $result;
-        
+
     } catch (Exception $e) {
         error_log("Exception in getAppointmentById: " . $e->getMessage());
         return null;
@@ -592,6 +659,34 @@ class AppointmentModel
         }
     }
 
+    // Get recent pending appointment requests for notification center
+    public function getRecentPendingAppointmentNotifications($limit = 8)
+    {
+        try {
+            $query = "SELECT a.appointment_id,
+                             a.student_id,
+                             a.category_id,
+                             a.created_at,
+                             c.category_name,
+                             COALESCE(NULLIF(LTRIM(RTRIM(CONCAT(COALESCE(si.last_name, ''), ', ', COALESCE(si.first_name, '')))), ','), CAST(a.student_id AS VARCHAR(50))) AS student_name
+                      FROM appointments a
+                      LEFT JOIN appointment_categories c ON a.category_id = c.category_id
+                      LEFT JOIN students st ON a.student_id = st.student_id
+                      LEFT JOIN student_information si ON st.student_id = si.student_id
+                      WHERE a.status = ?
+                      ORDER BY a.created_at DESC";
+
+            $stmt = $this->conn->prepare($query);
+            $stmt->execute(['pending']);
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            return array_slice($rows, 0, max(1, (int) $limit));
+        } catch (Exception $e) {
+            error_log("Exception in getRecentPendingAppointmentNotifications: " . $e->getMessage());
+            return [];
+        }
+    }
+
     // Reschedule appointment
     public function rescheduleAppointment($appointment_id, $new_date)
     {
@@ -674,7 +769,7 @@ class AppointmentModel
 
             $stmt = $this->conn->prepare($query);
             if (!$stmt) {
-                throw new Exception("Prepare failed: " . $this->conn->error);
+                throw new Exception("Prepare failed: " . $this->pdoErrorMessage());
             }
 
             $stmt->execute($params);
@@ -691,10 +786,35 @@ class AppointmentModel
     public function getAvailableTimeSlots($officer_id, $date)
     {
         $available_slots = [];
-        $morning_slots = ['08:00', '09:00', '10:00', '11:00'];
-        $afternoon_slots = ['13:00', '14:00', '15:00', '16:00'];
+        $settings = $this->loadSettings();
+        $officer_id = $officer_id ?: $this->getDefaultOfficerId();
 
-        $slots = array_merge($morning_slots, $afternoon_slots);
+        $start = $settings['office_hours_start'] ?? '08:00';
+        $morningEnd = $settings['office_hours_morning_end'] ?? '12:00';
+        $afternoonStart = $settings['office_hours_afternoon_start'] ?? '13:00';
+        $end = $settings['office_hours_end'] ?? '17:00';
+        $durationMinutes = max(15, (int) ($settings['appointment_duration_minutes'] ?? 60));
+
+        $slots = [];
+        $ranges = [
+            [$start, $morningEnd],
+            [$afternoonStart, $end],
+        ];
+
+        foreach ($ranges as $range) {
+            [$rangeStart, $rangeEnd] = $range;
+            $current = \DateTime::createFromFormat('Y-m-d H:i', $date . ' ' . $rangeStart);
+            $rangeEndTime = \DateTime::createFromFormat('Y-m-d H:i', $date . ' ' . $rangeEnd);
+
+            if (!$current || !$rangeEndTime) {
+                continue;
+            }
+
+            while ($current < $rangeEndTime) {
+                $slots[] = $current->format('H:i');
+                $current->modify('+' . $durationMinutes . ' minutes');
+            }
+        }
 
         foreach ($slots as $time) {
             $datetime = $date . ' ' . $time;
@@ -750,6 +870,101 @@ class AppointmentModel
         } catch (Exception $e) {
             $this->conn->rollBack();
             error_log("Error rejecting appointment: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Create notification for appointment status change
+     */
+    public function createAppointmentNotification($appointment_id, $status, $officer_id, $officer_name = '')
+    {
+        try {
+            require_once __DIR__ . '/NotificationModel.php';
+            $notificationModel = new NotificationModel();
+
+            $appointment = $this->getAppointmentById($appointment_id);
+            if (!$appointment) {
+                throw new Exception("Appointment not found");
+            }
+
+            // Get student name
+            $studentName = $appointment['student_name'] ?? 'Student ID: ' . $appointment['student_id'];
+
+            // Build notification title and message based on status
+            $notificationTypeMap = [
+                'approved' => [
+                    'type' => 'appointment_approved',
+                    'title' => 'Appointment Approved',
+                    'message' => "Your appointment on " . date('M j, Y g:i A', strtotime($appointment['scheduled_date'])) . " has been approved by Officer " . ($officer_name ?: 'Staff'),
+                    'recipient_role' => 'student',
+                    'recipient_id' => (int) $appointment['student_id'],
+                    'target_url' => 'index.php?page=student_appointments&appointment_id=' . $appointment_id
+                ],
+                'rejected' => [
+                    'type' => 'appointment_rejected',
+                    'title' => 'Appointment Rejected',
+                    'message' => "Your appointment request has been rejected. Please contact the office for more information.",
+                    'recipient_role' => 'student',
+                    'recipient_id' => (int) $appointment['student_id'],
+                    'target_url' => 'index.php?page=student_appointments&appointment_id=' . $appointment_id
+                ],
+                'rescheduled' => [
+                    'type' => 'appointment_rescheduled',
+                    'title' => 'Appointment Rescheduled',
+                    'message' => "Your appointment has been rescheduled to " . date('M j, Y g:i A', strtotime($appointment['scheduled_date'])),
+                    'recipient_role' => 'student',
+                    'recipient_id' => (int) $appointment['student_id'],
+                    'target_url' => 'index.php?page=student_appointments&appointment_id=' . $appointment_id
+                ],
+                'completed' => [
+                    'type' => 'appointment_completed',
+                    'title' => 'Appointment Completed',
+                    'message' => "Your appointment on " . date('M j, Y g:i A', strtotime($appointment['scheduled_date'])) . " has been marked as completed.",
+                    'recipient_role' => 'student',
+                    'recipient_id' => (int) $appointment['student_id'],
+                    'target_url' => 'index.php?page=student_appointments&appointment_id=' . $appointment_id
+                ],
+                'pending' => [
+                    'type' => 'appointment_pending',
+                    'title' => 'Appointment Pending',
+                    'message' => 'Your appointment request is pending review by the assigned officer.',
+                    'recipient_role' => 'student',
+                    'recipient_id' => (int) $appointment['student_id'],
+                    'target_url' => 'index.php?page=student_appointments&appointment_id=' . $appointment_id
+                ],
+                'request' => [
+                    'type' => 'appointment_request',
+                    'title' => 'Appointment Request',
+                    'message' => "New appointment request from " . $studentName . " on " . date('M j, Y g:i A', strtotime($appointment['scheduled_date'])),
+                    'recipient_role' => 'officer',
+                    'recipient_id' => (int) $officer_id,
+                    'target_url' => 'index.php?page=officer_appointments&appointment_id=' . $appointment_id
+                ],
+                'cancelled' => [
+                    'type' => 'appointment_cancelled',
+                    'title' => 'Appointment Cancelled',
+                    'message' => 'Your appointment has been cancelled.',
+                    'recipient_role' => 'student',
+                    'recipient_id' => (int) $appointment['student_id'],
+                    'target_url' => 'index.php?page=student_appointments&appointment_id=' . $appointment_id
+                ]
+            ];
+
+            $notifConfig = $notificationTypeMap[$status] ?? $notificationTypeMap['pending'];
+            
+            return $notificationModel->createNotificationForRecipient(
+                $notifConfig['recipient_role'],
+                (int) $notifConfig['recipient_id'],
+                $notifConfig['type'],
+                $notifConfig['title'],
+                $notifConfig['message'],
+                $appointment_id,
+                $notifConfig['target_url']
+            );
+
+        } catch (Exception $e) {
+            error_log("Error creating appointment notification: " . $e->getMessage());
             return false;
         }
     }

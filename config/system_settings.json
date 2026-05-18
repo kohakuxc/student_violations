@@ -1,0 +1,36 @@
+{
+    "app_name": "Student Violations System",
+    "default_officer_id": 1,
+    "dashboard_page_size": 10,
+    "student_dashboard_page_size": 5,
+    "student_default_view": "violations",
+    "student_show_escalation_history": true,
+    "student_email_notify_appointment_updates": true,
+    "appointment_duration_minutes": 60,
+    "office_hours_start": "08:00",
+    "office_hours_morning_end": "12:00",
+    "office_hours_afternoon_start": "13:00",
+    "office_hours_end": "17:00",
+    "working_days": [
+        1,
+        2,
+        3,
+        4,
+        5
+    ],
+    "min_advance_days": 0,
+    "max_advance_days": 30,
+    "max_file_size_mb": 3,
+    "allowed_file_types": [
+        "application/pdf",
+        "image/jpeg",
+        "image/jpg"
+    ],
+    "email_from_name": "STI Student Violations System",
+    "email_from_address": "noreply@fairview-violations.edu.ph",
+    "officer_email_notify_new_appointments": true,
+    "officer_email_notify_status_changes": true,
+    "officer_default_sort": "scheduled_date_desc",
+    "auto_escalation_enabled": true,
+    "minor_escalation_threshold": 3
+}
