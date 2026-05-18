@@ -20,6 +20,7 @@ $violationTypeModel = new ViolationTypeModel();
 $violation_types = $violationTypeModel->getActiveViolationTypes();
 
 $success = "";
+$new_violation_id = null;
 $error = "";
 $student_lookup = $student_id = $violation_type = $description = $date_of_violation = '';
 $selected_student = null;
@@ -56,13 +57,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
             if ($result['success']) {
                 $success = $result['message'];
+                $new_violation_id = $result['violation_id'] ?? null;
                 $student_lookup = $student_id = $violation_type = $description = $date_of_violation = '';
                 $selected_student = null;
             } else {
                 $error = $result['message'];
             }
         } else {
-            $error = "Student not found! Please check the student name, student number, or 6-digit email code.";
+            $error = "Student not found! Please check the student name or student number.";
         }
     }
 }

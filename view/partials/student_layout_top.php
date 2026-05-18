@@ -71,11 +71,10 @@ if (isset($_SESSION['student_id'])) {
             display: flex;
             align-items: center;
             justify-content: center;
-            background-color: #0a4572;
+            background-color: #0b5793;
             border-radius: 50%;
             cursor: pointer;
             transition-duration: .3s;
-            box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.13);
             border: none;
         }
 
@@ -85,10 +84,6 @@ if (isset($_SESSION['student_id'])) {
 
         .notification-btn .bell path {
             fill: #fff;
-        }
-
-        .notification-btn:hover {
-            background-color: #0a4572;
         }
 
         .notification-btn:hover .bell {

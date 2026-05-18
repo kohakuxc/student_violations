@@ -7,7 +7,12 @@
   </div>
 
   <?php if (!empty($success)): ?>
-    <div class="alert alert-success">✅ <?php echo htmlspecialchars($success); ?></div>
+    <div class="alert alert-success" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+      <span>✅ <?php echo htmlspecialchars($success); ?></span>
+      <?php if (!empty($new_violation_id)): ?>
+        <a class="btn btn-primary btn-small" href="index.php?page=all_violations&highlight_id=<?php echo (int) $new_violation_id; ?>">View</a>
+      <?php endif; ?>
+    </div>
   <?php endif; ?>
 
   <?php if (!empty($error)): ?>
@@ -69,5 +74,18 @@
 </div>
 
 <script src="assets/js/student_lookup.js"></script>
+<script>
+  (function () {
+    const form = document.querySelector('.violation-form');
+    if (!form) return;
+    form.addEventListener('submit', function () {
+      const button = form.querySelector('button[type="submit"]');
+      if (!button) return;
+      if (button.disabled) return;
+      button.disabled = true;
+      button.textContent = 'Recording...';
+    });
+  })();
+</script>
 
 <?php include 'view/partials/layout_bottom.php'; ?>

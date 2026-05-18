@@ -1,7 +1,7 @@
 <?php
 /**
  * Database Connection
- * Supports SQL Server locally and PostgreSQL/Supabase in production.
+ * Supports SQL Server locally and Supabase w PostgreSQL in production.
  */
 
 require_once __DIR__ . '/env_loader.php';
