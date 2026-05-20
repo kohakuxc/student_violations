@@ -72,7 +72,12 @@ try {
             $data = json_decode(file_get_contents('php://input'), true) ?? [];
             $appointment_id = intval($data['appointment_id'] ?? $_POST['appointment_id'] ?? 0);
             $note_text = trim($data['note'] ?? $_POST['note'] ?? '');
+            $honeypot = trim((string) ($data['contact_website'] ?? $_POST['contact_website'] ?? ''));
             $officer_id = (int) $_SESSION['officer_id'];
+
+            if ($honeypot !== '') {
+                throw new Exception('Submission flagged as spam.');
+            }
 
             if (!$appointment_id) {
                 throw new Exception('Appointment ID required');
@@ -115,7 +120,12 @@ try {
             $data = json_decode(file_get_contents('php://input'), true) ?? [];
             $appointment_id = intval($data['appointment_id'] ?? $_POST['appointment_id'] ?? 0);
             $reason = trim($data['reason'] ?? $_POST['reason'] ?? '');
+            $honeypot = trim((string) ($data['contact_website'] ?? $_POST['contact_website'] ?? ''));
             $officer_id = (int) $_SESSION['officer_id'];
+
+            if ($honeypot !== '') {
+                throw new Exception('Submission flagged as spam.');
+            }
 
             if (!$appointment_id) {
                 throw new Exception('Appointment ID required');
@@ -149,7 +159,12 @@ try {
             $data = json_decode(file_get_contents('php://input'), true) ?? [];
             $appointment_id = intval($data['appointment_id'] ?? $_POST['appointment_id'] ?? 0);
             $note_text = trim($data['note'] ?? $_POST['note'] ?? '');
+            $honeypot = trim((string) ($data['contact_website'] ?? $_POST['contact_website'] ?? ''));
             $officer_id = (int) $_SESSION['officer_id'];
+
+            if ($honeypot !== '') {
+                throw new Exception('Submission flagged as spam.');
+            }
 
             if (!$appointment_id) {
                 throw new Exception('Appointment ID required');
@@ -180,7 +195,12 @@ try {
             $appointment_id = intval($data['appointment_id'] ?? $_POST['appointment_id'] ?? 0);
             $status = trim($data['status'] ?? $_POST['status'] ?? '');
             $note_text = trim($data['note'] ?? $_POST['note'] ?? '');
+            $honeypot = trim((string) ($data['contact_website'] ?? $_POST['contact_website'] ?? ''));
             $officer_id = (int) $_SESSION['officer_id'];
+
+            if ($honeypot !== '') {
+                throw new Exception('Submission flagged as spam.');
+            }
 
             $allowed_statuses = ['pending', 'approved', 'in_progress', 'completed', 'rejected', 'cancelled', 'rescheduled'];
             if (!$appointment_id) {
@@ -221,6 +241,11 @@ try {
             $data = json_decode(file_get_contents('php://input'), true) ?? [];
             $appointment_id = intval($data['appointment_id'] ?? $_POST['appointment_id'] ?? 0);
             $reason = trim($data['reason'] ?? $_POST['reason'] ?? '');
+            $honeypot = trim((string) ($data['contact_website'] ?? $_POST['contact_website'] ?? ''));
+
+            if ($honeypot !== '') {
+                throw new Exception('Submission flagged as spam.');
+            }
 
             if (!$appointment_id) {
                 throw new Exception('Appointment ID required');

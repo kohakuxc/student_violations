@@ -525,7 +525,7 @@ function submitApprove() {
             'Content-Type': 'application/json',
             'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || ''
         },
-        body: JSON.stringify({appointment_id: id, note: note})
+        body: JSON.stringify({appointment_id: id, note: note, contact_website: ''})
     })
     .then(r => r.json())
     .then(data => {
@@ -561,7 +561,7 @@ function submitReject() {
             'Content-Type': 'application/json',
             'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || ''
         },
-        body: JSON.stringify({appointment_id: id, reason: reason})
+        body: JSON.stringify({appointment_id: id, reason: reason, contact_website: ''})
     })
     .then(r => r.json())
     .then(data => {
@@ -597,7 +597,7 @@ function submitNote() {
             'Content-Type': 'application/json',
             'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || ''
         },
-        body: JSON.stringify({appointment_id: id, note: note})
+        body: JSON.stringify({appointment_id: id, note: note, contact_website: ''})
     })
     .then(r => r.json())
     .then(data => {
@@ -636,7 +636,7 @@ function submitStatusUpdate() {
             'Content-Type': 'application/json',
             'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || ''
         },
-        body: JSON.stringify({appointment_id: id, status: status, note: note})
+        body: JSON.stringify({appointment_id: id, status: status, note: note, contact_website: ''})
     })
     .then(r => r.json())
     .then(data => {

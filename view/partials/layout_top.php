@@ -9,6 +9,7 @@ require_once __DIR__ . '/../../config/db_connection.php';
 require_once __DIR__ . '/../../model/NotificationModel.php';
 require_once __DIR__ . '/../../model/MessageModel.php';
 require_once __DIR__ . '/../../helper/CsrfHelper.php';
+require_once __DIR__ . '/../../helper/AuthHelper.php';
 
 $notifications = [];
 $unreadCount = 0;
@@ -388,6 +389,18 @@ if (isset($_SESSION['officer_id'])) {
                    href="index.php?page=settings">
                     <i class="fas fa-gear"></i> Settings
                 </a>
+                <?php if (canImportExcel()): ?>
+                    <a class="sidebar-link <?php echo ($_GET['page'] ?? null) === 'import_violations' ? 'active' : ''; ?>" 
+                       href="index.php?page=import_violations">
+                        <i class="fas fa-file-excel"></i> Excel Import
+                    </a>
+                <?php endif; ?>
+                <?php if (isSuperAdminUser()): ?>
+                    <a class="sidebar-link <?php echo ($_GET['page'] ?? null) === 'admin_management' ? 'active' : ''; ?>" 
+                       href="index.php?page=admin_management">
+                        <i class="fas fa-user-shield"></i> Superadmin
+                    </a>
+                <?php endif; ?>
             </nav>
         </aside>
 

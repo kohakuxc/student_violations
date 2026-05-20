@@ -271,12 +271,28 @@ class StudentAppointmentController
     public function cancelAppointment()
     {
         try {
+            csrfRequireValidToken($_POST['csrf_token'] ?? '', $_POST['form_key'] ?? null, $_POST['form_token'] ?? null);
+
             $appointment_id = $_POST['appointment_id'] ?? null;
             $reason = $_POST['reason'] ?? null;
             $student_id = $_SESSION['student_id'] ?? null;
+            $honeypot = trim((string) ($_POST['contact_website'] ?? ''));
+
+            if ($honeypot !== '') {
+                throw new Exception('Submission flagged as spam.');
+            }
 
             if (!$appointment_id || !$reason || !$student_id) {
                 throw new Exception('Missing required fields');
+            }
+
+            if (!rateLimitCheck('cancel_appointment_' . (int) $student_id, 6, 120)) {
+                throw new Exception('Too many cancellation requests. Please wait a moment.');
+            }
+
+            $validation = validateFreeText($reason, 5, 500);
+            if (!$validation['valid']) {
+                throw new Exception($validation['message']);
             }
 
             // Verify student owns this appointment
@@ -286,7 +302,7 @@ class StudentAppointmentController
             }
 
             // Cancel appointment
-            if (!$this->appointmentModel->cancelAppointment($appointment_id, $reason, $student_id)) {
+            if (!$this->appointmentModel->cancelAppointment($appointment_id, $validation['value'], $student_id)) {
                 throw new Exception('Failed to cancel appointment');
             }
 

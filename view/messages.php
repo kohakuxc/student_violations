@@ -261,6 +261,7 @@ if (!$isOfficer) {
             <div class="chat-empty">No messages yet.</div>
         </div>
         <form id="chatForm" class="chat-compose">
+            <input type="text" id="messageHoneypot" name="contact_website" value="" style="display:none" tabindex="-1" autocomplete="off">
             <textarea id="messageInput" placeholder="Type your message..." disabled></textarea>
             <button type="submit" id="sendBtn" disabled>Send</button>
         </form>
@@ -423,7 +424,8 @@ if (!$isOfficer) {
         }
         const body = new URLSearchParams({
             conversation_id: String(selectedConversationId),
-            message_body: text
+            message_body: text,
+            contact_website: document.getElementById('messageHoneypot')?.value || ''
         });
 
         const res = await fetch('api/messages.php?action=sendMessage', {

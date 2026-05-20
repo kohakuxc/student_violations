@@ -29,7 +29,7 @@ if (!($conn instanceof PDO)) {
     exit;
 }
 
-function userCanAccessConversation(PDO $conn, $conversation_id, $user_id, $user_role)
+function ensureConversationParticipant(PDO $conn, $conversation_id, $user_id, $user_role)
 {
     $query = "SELECT COUNT(*) AS cnt
               FROM conversation_participants
@@ -37,7 +37,48 @@ function userCanAccessConversation(PDO $conn, $conversation_id, $user_id, $user_
     $stmt = $conn->prepare($query);
     $stmt->execute([(int) $conversation_id, (int) $user_id, (string) $user_role]);
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
-    return ((int) ($row['cnt'] ?? 0)) > 0;
+    if (((int) ($row['cnt'] ?? 0)) > 0) {
+        return true;
+    }
+
+    $driver = $conn->getAttribute(PDO::ATTR_DRIVER_NAME);
+    if ($driver === 'pgsql') {
+        $insert = $conn->prepare(
+            "INSERT INTO conversation_participants (conversation_id, user_id, user_role, created_at, updated_at)
+             VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+             ON CONFLICT (conversation_id, user_id, user_role) DO NOTHING"
+        );
+        return $insert->execute([(int) $conversation_id, (int) $user_id, (string) $user_role]);
+    }
+
+    $insert = $conn->prepare(
+        "INSERT INTO conversation_participants (conversation_id, user_id, user_role, created_at, updated_at)
+         VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
+    );
+    return $insert->execute([(int) $conversation_id, (int) $user_id, (string) $user_role]);
+}
+
+function userCanAccessConversation(PDO $conn, $conversation_id, $user_id, $user_role)
+{
+    $query = "SELECT student_id, officer_id
+              FROM conversations
+              WHERE conversation_id = ?";
+    $stmt = $conn->prepare($query);
+    $stmt->execute([(int) $conversation_id]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$row) {
+        return false;
+    }
+
+    if ($user_role === 'student' && (int) $row['student_id'] !== (int) $user_id) {
+        return false;
+    }
+    if ($user_role === 'officer' && (int) $row['officer_id'] !== (int) $user_id) {
+        return false;
+    }
+
+    ensureConversationParticipant($conn, $conversation_id, $user_id, $user_role);
+    return true;
 }
 
 function hasStudentOfficerAppointmentPair(PDO $conn, $student_id, $officer_id)
@@ -82,7 +123,12 @@ try {
         case 'sendMessage':
             $conversation_id = (int) ($_POST['conversation_id'] ?? 0);
             $message_body = trim((string) ($_POST['message_body'] ?? ''));
+            $honeypot = trim((string) ($_POST['contact_website'] ?? ''));
             
+            if ($honeypot !== '') {
+                throw new Exception('Submission flagged as spam.');
+            }
+
             if (!$conversation_id || empty($message_body)) {
                 throw new Exception('Conversation ID and message body required');
             }
