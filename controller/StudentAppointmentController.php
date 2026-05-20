@@ -3,6 +3,9 @@ require_once __DIR__ . '/../model/AppointmentModel.php';
 require_once __DIR__ . '/../model/StudentModel.php';
 require_once __DIR__ . '/../helper/EmailNotification.php';
 require_once __DIR__ . '/../config/system_settings.php';
+require_once __DIR__ . '/../helper/CsrfHelper.php';
+require_once __DIR__ . '/../helper/TextGuard.php';
+require_once __DIR__ . '/../helper/RateLimiter.php';
 
 class StudentAppointmentController
 {
@@ -101,6 +104,8 @@ class StudentAppointmentController
     public function createAppointment()
     {
         try {
+            csrfRequireValidToken($_POST['csrf_token'] ?? '', $_POST['form_key'] ?? null, $_POST['form_token'] ?? null);
+
             // Validate form data
             $student_id = $_SESSION['student_id'] ?? null;
             $category_id = $_POST['category_id'] ?? null;
@@ -109,9 +114,23 @@ class StudentAppointmentController
             $date = $_POST['date'] ?? null;
             $time = $_POST['time'] ?? null;
             $officer_id = 1; // Only one officer
+            $honeypot = trim((string) ($_POST['contact_website'] ?? ''));
+
+            if ($honeypot !== '') {
+                throw new Exception('Submission flagged as spam.');
+            }
+
+            if (!rateLimitCheck('student_appointment_' . (int) $student_id, 5, 300)) {
+                throw new Exception('Too many appointment requests. Please wait a moment and try again.');
+            }
 
             if (!$student_id || !$category_id || !$subcategory_id || !$description || !$date || !$time) {
                 throw new Exception('All required fields must be filled');
+            }
+
+            $validation = validateFreeText($description, 10, 1000);
+            if (!$validation['valid']) {
+                throw new Exception($validation['message']);
             }
 
             // Validate date format
@@ -152,9 +171,10 @@ class StudentAppointmentController
                 $student_id,
                 $category_id,
                 $subcategory_id,
-                $description,
+                $validation['value'],
                 $scheduled_date,
-                $image_path
+                $image_path,
+                $validation['self_harm']
             );
 
             if (!$appointment_id) {

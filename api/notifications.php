@@ -10,6 +10,7 @@ if (!isset($_SESSION['officer_id']) && !isset($_SESSION['student_id'])) {
 
 require_once __DIR__ . '/../config/db_connection.php';
 require_once __DIR__ . '/../model/NotificationModel.php';
+require_once __DIR__ . '/../helper/CsrfHelper.php';
 
 $action = $_GET['action'] ?? null;
 $notificationModel = new NotificationModel();
@@ -27,6 +28,11 @@ $studentAllowedTypes = [
 ];
 
 $allowedTypes = $isOfficer ? null : $studentAllowedTypes;
+$writeActions = ['markAsRead', 'markAllAsRead'];
+if (in_array($action, $writeActions, true)) {
+    $token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? ($_POST['csrf_token'] ?? '');
+    csrfRequireValidToken($token);
+}
 
 try {
     switch ($action) {

@@ -388,7 +388,10 @@ if (!$isOfficer) {
         const body = new URLSearchParams({ conversation_id: String(conversationId) });
         await fetch('api/messages.php?action=markConversationAsRead', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || ''
+            },
             body: body.toString()
         });
     }
@@ -415,6 +418,9 @@ if (!$isOfficer) {
     }
 
     async function sendMessage(text) {
+        if (!window.confirm('Send this message?')) {
+            return;
+        }
         const body = new URLSearchParams({
             conversation_id: String(selectedConversationId),
             message_body: text
@@ -422,7 +428,10 @@ if (!$isOfficer) {
 
         const res = await fetch('api/messages.php?action=sendMessage', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || ''
+            },
             body: body.toString()
         });
         const data = await res.json();
@@ -436,6 +445,9 @@ if (!$isOfficer) {
         if (currentUserRole !== 'student' || assignedOfficerId <= 0 || studentId <= 0) {
             return;
         }
+        if (!window.confirm('Start a new conversation with your assigned officer?')) {
+            return;
+        }
 
         const body = new URLSearchParams({
             officer_id: String(assignedOfficerId),
@@ -444,7 +456,10 @@ if (!$isOfficer) {
 
         const res = await fetch('api/messages.php?action=getOrCreateConversation', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || ''
+            },
             body: body.toString()
         });
         const data = await res.json();

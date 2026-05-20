@@ -1,6 +1,8 @@
 <?php
 require_once __DIR__ . '/../config/system_settings.php';
 require_once __DIR__ . '/../model/NotificationModel.php';
+require_once __DIR__ . '/../helper/CsrfHelper.php';
+require_once __DIR__ . '/../helper/AuditLogger.php';
 
 if (!isset($_SESSION['officer_id'])) {
     header('Location: index.php?page=login');
@@ -10,6 +12,14 @@ if (!isset($_SESSION['officer_id'])) {
 $settings = loadSystemSettings();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    try {
+        csrfRequireValidToken($_POST['csrf_token'] ?? '', $_POST['form_key'] ?? null, $_POST['form_token'] ?? null);
+    } catch (Exception $e) {
+        $_SESSION['settings_flash'] = ['type' => 'error', 'message' => $e->getMessage()];
+        header('Location: index.php?page=settings&tab=' . urlencode((string) ($_POST['active_tab'] ?? 'student')));
+        exit();
+    }
+
     $activeTab = trim((string) ($_POST['active_tab'] ?? 'student'));
     $allowedTabs = ['student', 'officer', 'admin'];
     if (!in_array($activeTab, $allowedTabs, true)) {
@@ -72,6 +82,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             global $conn;
             $notificationModel = new NotificationModel();
+            $auditLogger = new AuditLogger();
             $officer_name = htmlspecialchars((string) ($_SESSION['name'] ?? 'Unknown Officer'));
             $tab_name = ucfirst($activeTab);
             $title = $officer_name . ' updated ' . $tab_name . ' settings';
@@ -94,6 +105,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $target_url
                 );
             }
+            $auditLogger->log((int) $_SESSION['officer_id'], !empty($_SESSION['is_superadmin']) ? 'superadmin' : 'officer', 'settings_updated', 'settings', null, [
+                'tab' => $activeTab
+            ]);
         } catch (Exception $e) {
             error_log("Error creating settings notification: " . $e->getMessage());
         }

@@ -20,18 +20,26 @@ class OfficerModel
     public function authenticate($username, $password)
     {
         try {
-            $query = "SELECT officer_id, name, password FROM officers WHERE username = ?";
+            $query = "SELECT officer_id, name, password, is_admin, is_superadmin, is_active, can_import_excel
+                      FROM officers WHERE username = ?";
             $stmt = $this->conn->prepare($query);
             $stmt->execute([$username]);
 
             $officer = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            if ($officer && password_verify($password, $officer['password'])) {
+            if ($officer && !empty($officer['is_active']) && password_verify($password, $officer['password'])) {
                 return [
                     'success' => true,
                     'officer_id' => $officer['officer_id'],
-                    'name' => $officer['name']
+                    'name' => $officer['name'],
+                    'is_admin' => !empty($officer['is_admin']) || !empty($officer['is_superadmin']),
+                    'is_superadmin' => !empty($officer['is_superadmin']),
+                    'can_import_excel' => !empty($officer['can_import_excel']),
                 ];
+            }
+
+            if ($officer && empty($officer['is_active'])) {
+                return ['success' => false, 'message' => 'Account is disabled. Please contact the superadmin.'];
             }
 
             return ['success' => false, 'message' => 'Invalid credentials'];

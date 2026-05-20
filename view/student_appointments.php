@@ -90,7 +90,16 @@ function getStatusBadgeColor($status)
                 </div>
                 <div class="card-body">
                     <form id="appointmentForm" action="api/create_appointment.php" method="POST"
-                        enctype="multipart/form-data">
+                        enctype="multipart/form-data" data-confirm="Submit this appointment request?">
+                        <?php
+                            require_once __DIR__ . '/../helper/CsrfHelper.php';
+                            $formKey = 'student_appointment_form';
+                            $formToken = csrfGenerateFormToken($formKey);
+                        ?>
+                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrfToken(), ENT_QUOTES, 'UTF-8'); ?>">
+                        <input type="hidden" name="form_key" value="<?php echo htmlspecialchars($formKey, ENT_QUOTES, 'UTF-8'); ?>">
+                        <input type="hidden" name="form_token" value="<?php echo htmlspecialchars($formToken, ENT_QUOTES, 'UTF-8'); ?>">
+                        <input type="text" name="contact_website" value="" style="display:none" tabindex="-1" autocomplete="off">
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label for="category_id" class="form-label">
@@ -436,6 +445,17 @@ function getStatusBadgeColor($status)
     // --- Submit new appointment form via AJAX ---
     document.getElementById('appointmentForm')?.addEventListener('submit', function (e) {
         e.preventDefault();
+        const confirmMessage = this.dataset.confirm || 'Submit this appointment request?';
+        if (!window.confirm(confirmMessage)) {
+            return;
+        }
+        if (this.dataset.submitted === 'true') {
+            return;
+        }
+        this.dataset.submitted = 'true';
+        const submitBtn = this.querySelector('button[type="submit"]');
+        if (submitBtn) submitBtn.disabled = true;
+
         const formData = new FormData(this);
 
         fetch(this.action || 'api/create_appointment.php', { method: 'POST', body: formData })
@@ -446,7 +466,11 @@ function getStatusBadgeColor($status)
                 }
                 window.location.href = 'index.php?page=student_appointments&tab=history';
             })
-            .catch(() => showToast('Error submitting appointment.', 'danger'));
+            .catch(() => showToast('Error submitting appointment.', 'danger'))
+            .finally(() => {
+                this.dataset.submitted = 'false';
+                if (submitBtn) submitBtn.disabled = false;
+            });
     });
 
     // --- View appointment details ---
@@ -557,10 +581,16 @@ function getStatusBadgeColor($status)
         const id = document.getElementById('cancelAppointmentId').value;
         const reason = document.getElementById('cancelReason').value.trim();
         if (!reason) { alert('Please provide a cancellation reason.'); return; }
+        if (!window.confirm('Cancel this appointment?')) {
+            return;
+        }
 
         fetch('api/appointments.php?action=cancelAppointment', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || ''
+            },
             body: JSON.stringify({ appointment_id: id, reason: reason })
         })
             .then(r => r.json())

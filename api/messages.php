@@ -10,9 +10,18 @@ if (!isset($_SESSION['officer_id']) && !isset($_SESSION['student_id'])) {
 
 require_once __DIR__ . '/../config/db_connection.php';
 require_once __DIR__ . '/../model/MessageModel.php';
+require_once __DIR__ . '/../helper/CsrfHelper.php';
+require_once __DIR__ . '/../helper/TextGuard.php';
+require_once __DIR__ . '/../helper/RateLimiter.php';
 
 $action = $_GET['action'] ?? null;
 $messageModel = new MessageModel();
+
+$writeActions = ['sendMessage', 'markConversationAsRead', 'getOrCreateConversation', 'archiveConversation'];
+if (in_array($action, $writeActions, true)) {
+    $token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? ($_POST['csrf_token'] ?? '');
+    csrfRequireValidToken($token);
+}
 
 if (!($conn instanceof PDO)) {
     http_response_code(500);
@@ -82,11 +91,23 @@ try {
                 throw new Exception('Unauthorized conversation access');
             }
 
+            if (!rateLimitCheck('message_send_' . $user_role . '_' . $user_id, 12, 60)) {
+                throw new Exception('You are sending messages too quickly. Please wait a moment.');
+            }
+
+            $validation = validateFreeText($message_body, 2, 1000);
+            if (!$validation['valid']) {
+                throw new Exception($validation['message']);
+            }
+
             $message_id = $messageModel->sendMessage(
                 $conversation_id,
                 $user_id,
                 $user_role,
-                $message_body
+                $validation['value'],
+                null,
+                null,
+                $validation['self_harm']
             );
 
             if (!$message_id) {

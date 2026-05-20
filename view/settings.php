@@ -192,7 +192,15 @@ $daysMap = [
         </div>
     <?php endif; ?>
 
-    <form method="POST" action="index.php?page=settings">
+    <form method="POST" action="index.php?page=settings" data-confirm="Save these settings changes?">
+        <?php
+          require_once __DIR__ . '/../helper/CsrfHelper.php';
+          $formKey = 'settings_form';
+          $formToken = csrfGenerateFormToken($formKey);
+        ?>
+        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrfToken(), ENT_QUOTES, 'UTF-8'); ?>">
+        <input type="hidden" name="form_key" value="<?php echo htmlspecialchars($formKey, ENT_QUOTES, 'UTF-8'); ?>">
+        <input type="hidden" name="form_token" value="<?php echo htmlspecialchars($formToken, ENT_QUOTES, 'UTF-8'); ?>">
         <input type="hidden" name="active_tab" id="active_tab" value="<?php echo htmlspecialchars($activeTab); ?>">
 
         <div class="tab-row" style="margin-bottom: 16px;">

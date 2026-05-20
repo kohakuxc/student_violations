@@ -1,5 +1,5 @@
 <?php
-$showStudentTab = (($_GET['tab'] ?? '') === 'student-login') || isset($_GET['student_error']);
+require_once __DIR__ . '/../helper/CsrfHelper.php';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -106,43 +106,40 @@ $showStudentTab = (($_GET['tab'] ?? '') === 'student-login') || isset($_GET['stu
             height: 62px;
         }
 
-        /* Tabs Styling */
-        .login-tabs {
-            display: flex;
-            gap: 0;
-            margin-bottom: 24px;
-            border-bottom: 2px solid #e0e0e0;
-        }
-
-        .login-tab-button {
-            flex: 1;
-            padding: 12px 16px;
-            border: none;
-            background: transparent;
-            color: var(--muted);
-            font-weight: 600;
-            cursor: pointer;
-            border-bottom: 3px solid transparent;
-            font-size: 14px;
-            transition: all 0.3s ease;
-        }
-
-        .login-tab-button:hover {
-            color: var(--brand-blue);
-        }
-
-        .login-tab-button.active {
-            color: var(--brand-blue);
-            border-bottom-color: var(--brand-blue);
-        }
-
-        .tab-content {
+        .admin-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.6);
             display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            z-index: 50;
         }
 
-        .tab-content.active {
-            display: block;
-            animation: fadeIn 0.3s ease;
+        .admin-modal.open {
+            display: flex;
+        }
+
+        .admin-modal-dialog {
+            width: min(420px, 100%);
+            background: #fff;
+            border-radius: var(--card-radius);
+            padding: 28px;
+            box-shadow: 0 18px 45px rgba(0, 0, 0, 0.25);
+        }
+
+        .admin-modal-close {
+            border: 0;
+            background: #f3f4f6;
+            border-radius: 6px;
+            width: 32px;
+            height: 32px;
+            font-size: 20px;
+            line-height: 1;
+            color: #374151;
+            cursor: pointer;
+            float: right;
         }
 
         @keyframes fadeIn {
@@ -319,53 +316,8 @@ $showStudentTab = (($_GET['tab'] ?? '') === 'student-login') || isset($_GET['stu
                     <img src="assets/img/ax_logo.png" alt="ax">
                 </div>
 
-                <!-- Tab Navigation -->
-                <div class="login-tabs">
-                    <button class="login-tab-button <?php echo $showStudentTab ? 'active' : ''; ?>" data-tab="student-login">
-                        👤 Student
-                    </button>
-
-                    <button class="login-tab-button <?php echo $showStudentTab ? '' : 'active'; ?>" data-tab="admin-login">
-                        👮 Admin
-                    </button>
-                </div>
-
-                <!-- Admin Login Tab -->
-                <div id="admin-login" class="tab-content <?php echo $showStudentTab ? '' : 'active'; ?>">
-                    <h1 style="text-align: center; font-size: 22px; color: #2c3e50; margin: 0 0 18px;">Admin Login
-                    </h1>
-
-                    <?php if (!empty($error)): ?>
-                        <div class="alert">
-                            <?php echo htmlspecialchars($error); ?>
-                        </div>
-                    <?php endif; ?>
-
-                    <form method="POST" action="index.php?page=login">
-                        <input type="hidden" name="login_type" value="admin">
-
-                        <div class="form-group">
-                            <label for="username">Username</label>
-                            <input type="text" id="username" name="username" required autofocus>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="password">Password</label>
-                            <input type="password" id="password" name="password" required>
-                        </div>
-
-                        <button type="submit" class="btn-login">Sign In</button>
-                    </form>
-
-                    <div class="login-help">
-                        Having trouble logging in? <a href="#">Click here</a>
-                    </div>
-                </div>
-
-                <!-- Student Login Tab -->
-                <div id="student-login" class="tab-content <?php echo $showStudentTab ? 'active' : ''; ?>">
-                    <h1 style="text-align: center; font-size: 22px; color: #2c3e50; margin: 0 0 8px;">Student Login
-                    </h1>
+                <div class="student-login">
+                    <h1 style="text-align: center; font-size: 22px; color: #2c3e50; margin: 0 0 8px;">Student Login</h1>
                     <p style="text-align: center; color: #666; font-size: 13px; margin: 0 0 18px;">
                         Sign in with your Fairview STI email
                     </p>
@@ -382,39 +334,112 @@ $showStudentTab = (($_GET['tab'] ?? '') === 'student-login') || isset($_GET['stu
                             SIGN IN WITH YOUR O365 ACCOUNT
                         </a>
                     <?php else: ?>
-                        <button onclick="location.reload()" class="btn-microsoft">
+                        <button onclick="location.reload()" class="btn-microsoft" type="button">
                             <img src="assets/icons/windows.jpg" alt="Windows" class="btn-microsoft-icon">
                             SIGN IN WITH YOUR O365 ACCOUNT
                         </button>
                     <?php endif; ?>
+
+                    <button type="button" class="btn-login" id="openAdminModal" style="margin-top:16px;">
+                        Admin Login
+                    </button>
                 </div>
             </div>
         </div>
     </main>
 
+    <div class="admin-modal" id="adminModal" aria-hidden="true">
+        <div class="admin-modal-dialog" role="dialog" aria-modal="true">
+            <button class="admin-modal-close" type="button" id="closeAdminModal" aria-label="Close admin login">&times;</button>
+            <h1 style="text-align: center; font-size: 22px; color: #2c3e50; margin: 0 0 18px;">Admin Login</h1>
+
+            <?php if (!empty($error)): ?>
+                <div class="alert">
+                    <?php echo htmlspecialchars($error); ?>
+                </div>
+            <?php endif; ?>
+
+            <form method="POST" action="index.php?page=login" data-confirm="Sign in as admin?">
+                <input type="hidden" name="login_type" value="admin">
+                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrfToken(), ENT_QUOTES, 'UTF-8'); ?>">
+                <?php $formKey = 'admin_login_form'; $formToken = csrfGenerateFormToken($formKey); ?>
+                <input type="hidden" name="form_key" value="<?php echo htmlspecialchars($formKey, ENT_QUOTES, 'UTF-8'); ?>">
+                <input type="hidden" name="form_token" value="<?php echo htmlspecialchars($formToken, ENT_QUOTES, 'UTF-8'); ?>">
+
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+
+                <button type="submit" class="btn-login">Sign In</button>
+            </form>
+
+            <div class="login-help">
+                Forgot your password? <a href="index.php?page=admin_forgot_password">Request reset</a>
+            </div>
+        </div>
+    </div>
+
     <script>
-        // Tab Switching Logic
-        document.querySelectorAll('.login-tab-button').forEach(button => {
-            button.addEventListener('click', () => {
-                const tabName = button.getAttribute('data-tab');
+        (function () {
+            const modal = document.getElementById('adminModal');
+            const openBtn = document.getElementById('openAdminModal');
+            const closeBtn = document.getElementById('closeAdminModal');
 
-                // Remove active class from all buttons and content
-                document.querySelectorAll('.login-tab-button').forEach(btn => {
-                    btn.classList.remove('active');
+            function openModal() {
+                modal?.classList.add('open');
+                modal?.setAttribute('aria-hidden', 'false');
+            }
+
+            function closeModal() {
+                modal?.classList.remove('open');
+                modal?.setAttribute('aria-hidden', 'true');
+            }
+
+            if (openBtn) {
+                openBtn.addEventListener('click', openModal);
+            }
+            if (closeBtn) {
+                closeBtn.addEventListener('click', closeModal);
+            }
+            if (modal) {
+                modal.addEventListener('click', function (e) {
+                    if (e.target === modal) {
+                        closeModal();
+                    }
                 });
-                document.querySelectorAll('.tab-content').forEach(content => {
-                    content.classList.remove('active');
+            }
+
+            <?php if (!empty($error)): ?>
+            openModal();
+            <?php endif; ?>
+        })();
+    </script>
+
+    <script>
+        (function () {
+            document.querySelectorAll('form[data-confirm]').forEach(form => {
+                form.addEventListener('submit', function (e) {
+                    const message = form.getAttribute('data-confirm');
+                    if (message && !window.confirm(message)) {
+                        e.preventDefault();
+                        return;
+                    }
+                    if (form.dataset.submitted === 'true') {
+                        e.preventDefault();
+                        return;
+                    }
+                    form.dataset.submitted = 'true';
+                    const btn = form.querySelector('button[type="submit"]');
+                    if (btn) btn.disabled = true;
                 });
-
-                // Add active class to clicked button and corresponding content
-                button.classList.add('active');
-                document.getElementById(tabName).classList.add('active');
-
-                // Focus first input in the active tab
-                const firstInput = document.getElementById(tabName).querySelector('input, button');
-                if (firstInput) firstInput.focus();
             });
-        });
+        })();
     </script>
 </body>
 

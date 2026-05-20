@@ -19,7 +19,16 @@
     <div class="alert alert-error">❌ <?php echo htmlspecialchars($error); ?></div>
   <?php endif; ?>
 
-  <form method="POST" action="index.php?page=add_violation" class="violation-form">
+  <form method="POST" action="index.php?page=add_violation" class="violation-form" data-confirm="Submit this violation record?">
+    <?php
+      require_once __DIR__ . '/../helper/CsrfHelper.php';
+      $formKey = 'add_violation_form';
+      $formToken = csrfGenerateFormToken($formKey);
+    ?>
+    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrfToken(), ENT_QUOTES, 'UTF-8'); ?>">
+    <input type="hidden" name="form_key" value="<?php echo htmlspecialchars($formKey, ENT_QUOTES, 'UTF-8'); ?>">
+    <input type="hidden" name="form_token" value="<?php echo htmlspecialchars($formToken, ENT_QUOTES, 'UTF-8'); ?>">
+    <input type="text" name="contact_website" value="" style="display:none" tabindex="-1" autocomplete="off">
     <div class="form-group">
       <label for="student_lookup">Student Name / Student Number: <span class="required">*</span></label>
       <div class="student-lookup-wrap">
@@ -78,7 +87,12 @@
   (function () {
     const form = document.querySelector('.violation-form');
     if (!form) return;
-    form.addEventListener('submit', function () {
+    form.addEventListener('submit', function (e) {
+      const confirmMessage = form.dataset.confirm || '';
+      if (confirmMessage && !window.confirm(confirmMessage)) {
+        e.preventDefault();
+        return;
+      }
       const button = form.querySelector('button[type="submit"]');
       if (!button) return;
       if (button.disabled) return;

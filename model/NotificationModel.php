@@ -254,11 +254,11 @@ class NotificationModel
     public function isAdmin($officer_id)
     {
         try {
-            $query = "SELECT is_admin FROM officers WHERE officer_id = ?";
+            $query = "SELECT is_admin, is_superadmin FROM officers WHERE officer_id = ?";
             $stmt = $this->conn->prepare($query);
             $stmt->execute([(int) $officer_id]);
             $result = $stmt->fetch(\PDO::FETCH_ASSOC);
-            return (bool) ($result['is_admin'] ?? false);
+            return (bool) ($result['is_admin'] ?? false) || (bool) ($result['is_superadmin'] ?? false);
         } catch (Exception $e) {
             return false;
         }

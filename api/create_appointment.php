@@ -5,6 +5,9 @@ header('Content-Type: application/json');
 require_once __DIR__ . '/../config/env_loader.php';
 loadEnvFile(__DIR__ . '/../config/.env');
 require_once __DIR__ . '/../config/system_settings.php';
+require_once __DIR__ . '/../helper/CsrfHelper.php';
+require_once __DIR__ . '/../helper/TextGuard.php';
+require_once __DIR__ . '/../helper/RateLimiter.php';
 
 $settings = loadSystemSettings();
 
@@ -44,22 +47,36 @@ try {
     
     debug_log("Database connection established");
     
+    csrfRequireValidToken($_POST['csrf_token'] ?? '', $_POST['form_key'] ?? null, $_POST['form_token'] ?? null);
+
     $category_id = intval($_POST['category_id'] ?? 0);
     $subcategory_id = intval($_POST['subcategory_id'] ?? 0);
     $description = trim($_POST['description'] ?? '');
     $date = $_POST['date'] ?? null;
     $time = $_POST['time'] ?? null;
+    $honeypot = trim((string) ($_POST['contact_website'] ?? ''));
     
     debug_log("Form Data - Cat: $category_id, SubCat: $subcategory_id, Date: $date, Time: $time");
     
+    if ($honeypot !== '') {
+        debug_log("ERROR: Honeypot triggered", true);
+        throw new Exception('Submission flagged as spam');
+    }
+
+    if (!rateLimitCheck('student_appointment_' . (int) $_SESSION['student_id'], 5, 300)) {
+        debug_log("ERROR: Rate limit exceeded", true);
+        throw new Exception('Too many appointment requests. Please wait and try again.');
+    }
+
     if (!$category_id || !$subcategory_id || !$description || !$date || !$time) {
         debug_log("ERROR: Missing required fields", true);
         throw new Exception('All fields are required');
     }
-    
-    if (strlen($description) > 1000) {
-        debug_log("ERROR: Description too long", true);
-        throw new Exception('Description cannot exceed 1000 characters');
+
+    $validation = validateFreeText($description, 10, 1000);
+    if (!$validation['valid']) {
+        debug_log("ERROR: Description validation failed", true);
+        throw new Exception($validation['message']);
     }
     
     $evidence_image = null;
@@ -108,14 +125,19 @@ try {
         $_SESSION['student_id'],
         $category_id,
         $subcategory_id,
-        $description,
+        $validation['value'],
         $scheduled_datetime,
-        $evidence_image
+        $evidence_image,
+        $validation['self_harm']
     );
     
     debug_log("createAppointment result: " . ($result ? 'SUCCESS' : 'FAILED'));
     
     if (!$result) {
+        $appointment_date = date('Y-m-d', strtotime((string) $scheduled_datetime));
+        if ($appointment_date && $appointmentModel->studentHasAppointmentOnDate($_SESSION['student_id'], $appointment_date)) {
+            throw new Exception('You already have an appointment scheduled for this day.');
+        }
         throw new Exception('Database error: Failed to create appointment');
     }
     

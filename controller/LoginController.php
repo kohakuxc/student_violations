@@ -13,6 +13,15 @@ if (isset($_SESSION['officer_id'])) {
 $error = "";
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['login_type']) && $_POST['login_type'] === 'admin') {
+    require_once __DIR__ . '/../helper/CsrfHelper.php';
+    try {
+        csrfRequireValidToken($_POST['csrf_token'] ?? '', $_POST['form_key'] ?? null, $_POST['form_token'] ?? null);
+    } catch (Exception $e) {
+        $error = $e->getMessage();
+        include 'view/login.php';
+        exit();
+    }
+
     $username = $_POST['username'] ?? '';
     $password = $_POST['password'] ?? '';
 
@@ -29,6 +38,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['login_type']) && $_POS
         if ($result['success']) {
             $_SESSION['officer_id'] = $result['officer_id'];
             $_SESSION['name'] = $result['name'];
+            $_SESSION['is_admin'] = !empty($result['is_admin']);
+            $_SESSION['is_superadmin'] = !empty($result['is_superadmin']);
+            $_SESSION['can_import_excel'] = !empty($result['can_import_excel']);
             header("Location: index.php?page=dashboard");
             exit();
         } else {
