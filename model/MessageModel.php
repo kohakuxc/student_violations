@@ -4,6 +4,20 @@ require_once __DIR__ . '/../config/db_connection.php';
 class MessageModel
 {
     private $conn;
+    private $driverName;
+
+    private function driverName()
+    {
+        if ($this->driverName === null) {
+            $this->driverName = $this->conn->getAttribute(PDO::ATTR_DRIVER_NAME);
+        }
+        return $this->driverName;
+    }
+
+    private function isPgsql()
+    {
+        return $this->driverName() === 'pgsql';
+    }
 
     private function resolveConnection()
     {
@@ -48,16 +62,13 @@ class MessageModel
 
             // Create new conversation
             $query = "INSERT INTO conversations (student_id, officer_id, initiated_by_role, created_at, updated_at)
-                      VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                      RETURNING conversation_id";
+                      VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)";
 
             $stmt = $this->conn->prepare($query);
             $stmt->execute([(int) $student_id, (int) $officer_id, (string) $initiated_by_role]);
-            $result = $stmt->fetch(\PDO::FETCH_ASSOC);
+            $conversation_id = (int) $this->conn->lastInsertId();
 
-            if ($result) {
-                $conversation_id = (int) $result['conversation_id'];
-
+            if ($conversation_id > 0) {
                 // Add participants
                 $this->addParticipant($conversation_id, $student_id, 'student');
                 $this->addParticipant($conversation_id, $officer_id, 'officer');
@@ -76,11 +87,27 @@ class MessageModel
     private function addParticipant($conversation_id, $user_id, $user_role)
     {
         try {
-            $query = "INSERT INTO conversation_participants (conversation_id, user_id, user_role, created_at, updated_at)
-                      VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                      ON CONFLICT (conversation_id, user_id, user_role) DO NOTHING";
+            if ($this->isPgsql()) {
+                $query = "INSERT INTO conversation_participants (conversation_id, user_id, user_role, created_at, updated_at)
+                          VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                          ON CONFLICT (conversation_id, user_id, user_role) DO NOTHING";
+                $stmt = $this->conn->prepare($query);
+                return $stmt->execute([(int) $conversation_id, (int) $user_id, (string) $user_role]);
+            }
 
-            $stmt = $this->conn->prepare($query);
+            $check = $this->conn->prepare(
+                "SELECT COUNT(*) AS cnt FROM conversation_participants WHERE conversation_id = ? AND user_id = ? AND user_role = ?"
+            );
+            $check->execute([(int) $conversation_id, (int) $user_id, (string) $user_role]);
+            $exists = (int) ($check->fetchColumn() ?? 0);
+            if ($exists > 0) {
+                return true;
+            }
+
+            $stmt = $this->conn->prepare(
+                "INSERT INTO conversation_participants (conversation_id, user_id, user_role, created_at, updated_at)
+                 VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
+            );
             return $stmt->execute([(int) $conversation_id, (int) $user_id, (string) $user_role]);
         } catch (Exception $e) {
             error_log("Error adding participant: " . $e->getMessage());
@@ -89,15 +116,14 @@ class MessageModel
     }
 
     // Send message in conversation
-    public function sendMessage($conversation_id, $sender_id, $sender_role, $message_body, $attachment_path = null, $attachment_filename = null)
+    public function sendMessage($conversation_id, $sender_id, $sender_role, $message_body, $attachment_path = null, $attachment_filename = null, $is_self_harm = false)
     {
         try {
             $this->conn->beginTransaction();
 
             // Insert message
-            $query = "INSERT INTO messages (conversation_id, sender_id, sender_role, message_body, attachment_path, attachment_filename, created_at, updated_at)
-                      VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                      RETURNING message_id";
+            $query = "INSERT INTO messages (conversation_id, sender_id, sender_role, message_body, attachment_path, attachment_filename, is_self_harm, created_at, updated_at)
+                      VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)";
 
             $stmt = $this->conn->prepare($query);
             $stmt->execute([
@@ -106,11 +132,11 @@ class MessageModel
                 (string) $sender_role,
                 (string) $message_body,
                 (string) ($attachment_path ?? ''),
-                (string) ($attachment_filename ?? '')
+                (string) ($attachment_filename ?? ''),
+                $this->isPgsql() ? (bool) $is_self_harm : ($is_self_harm ? 1 : 0),
             ]);
 
-            $result = $stmt->fetch(\PDO::FETCH_ASSOC);
-            $message_id = $result ? (int) $result['message_id'] : null;
+            $message_id = (int) $this->conn->lastInsertId();
 
             // Update conversation last_message_at
             $query = "UPDATE conversations 
@@ -128,7 +154,7 @@ class MessageModel
             $stmt->execute([(int) $conversation_id, (string) $recipient_role]);
 
             $this->conn->commit();
-            return $message_id;
+            return $message_id > 0 ? $message_id : null;
         } catch (Exception $e) {
             $this->conn->rollBack();
             error_log("Error sending message: " . $e->getMessage());
@@ -140,15 +166,25 @@ class MessageModel
     public function getConversationMessages($conversation_id, $limit = 50, $offset = 0)
     {
         try {
-            $query = "SELECT message_id, sender_id, sender_role, message_body, attachment_path, attachment_filename, 
-                             is_read, read_at, created_at
-                      FROM messages
-                      WHERE conversation_id = ?
-                      ORDER BY created_at DESC
-                      LIMIT ? OFFSET ?";
-
-            $stmt = $this->conn->prepare($query);
-            $stmt->execute([(int) $conversation_id, (int) $limit, (int) $offset]);
+            if ($this->isPgsql()) {
+                $query = "SELECT message_id, sender_id, sender_role, message_body, attachment_path, attachment_filename, 
+                                 is_read, read_at, created_at
+                          FROM messages
+                          WHERE conversation_id = ?
+                          ORDER BY created_at DESC
+                          LIMIT ? OFFSET ?";
+                $stmt = $this->conn->prepare($query);
+                $stmt->execute([(int) $conversation_id, (int) $limit, (int) $offset]);
+            } else {
+                $query = "SELECT message_id, sender_id, sender_role, message_body, attachment_path, attachment_filename,
+                                 is_read, read_at, created_at
+                          FROM messages
+                          WHERE conversation_id = ?
+                          ORDER BY created_at DESC
+                          OFFSET ? ROWS FETCH NEXT ? ROWS ONLY";
+                $stmt = $this->conn->prepare($query);
+                $stmt->execute([(int) $conversation_id, (int) $offset, (int) $limit]);
+            }
             $messages = $stmt->fetchAll(\PDO::FETCH_ASSOC);
 
             // Reverse to get chronological order
@@ -211,39 +247,39 @@ class MessageModel
     public function getUserConversations($user_id, $user_role, $limit = 20, $offset = 0)
     {
         try {
-            if ($user_role === 'student') {
-                $query = "SELECT c.conversation_id, c.student_id, c.officer_id, c.subject, c.last_message_at, 
-                                 c.is_archived_by_student, c.created_at,
-                                 o.name as officer_name,
-                                 COALESCE(cp.unread_count, 0) as unread_count
-                          FROM conversations c
-                          JOIN officers o ON c.officer_id = o.officer_id
-                          LEFT JOIN conversation_participants cp ON c.conversation_id = cp.conversation_id 
-                                 AND cp.user_id = ? AND cp.user_role = 'student'
-                          WHERE c.student_id = ? AND c.is_archived_by_student = false
-                          ORDER BY c.last_message_at DESC NULLS LAST, c.created_at DESC
-                          LIMIT ? OFFSET ?";
+            $isStudent = $user_role === 'student';
+            $baseSelect = $isStudent
+                ? "SELECT c.conversation_id, c.student_id, c.officer_id, c.subject, c.last_message_at, 
+                          c.is_archived_by_student, c.created_at,
+                          o.name as officer_name,
+                          COALESCE(cp.unread_count, 0) as unread_count
+                   FROM conversations c
+                   JOIN officers o ON c.officer_id = o.officer_id
+                   LEFT JOIN conversation_participants cp ON c.conversation_id = cp.conversation_id 
+                          AND cp.user_id = ? AND cp.user_role = 'student'
+                   WHERE c.student_id = ? AND c.is_archived_by_student = false"
+                : "SELECT c.conversation_id, c.student_id, c.officer_id, c.subject, c.last_message_at,
+                          c.is_archived_by_officer, c.created_at,
+                          COALESCE(NULLIF(LTRIM(RTRIM(CONCAT(COALESCE(si.last_name, ''), ', ', COALESCE(si.first_name, '')))), ','), CAST(st.student_id AS VARCHAR(50))) as student_name,
+                          COALESCE(cp.unread_count, 0) as unread_count
+                   FROM conversations c
+                   JOIN students st ON c.student_id = st.student_id
+                   LEFT JOIN student_information si ON st.student_id = si.student_id
+                   LEFT JOIN conversation_participants cp ON c.conversation_id = cp.conversation_id 
+                          AND cp.user_id = ? AND cp.user_role = 'officer'
+                   WHERE c.officer_id = ? AND c.is_archived_by_officer = false";
+
+            if ($this->isPgsql()) {
+                $query = $baseSelect . " ORDER BY c.last_message_at DESC NULLS LAST, c.created_at DESC LIMIT ? OFFSET ?";
+                $stmt = $this->conn->prepare($query);
+                $stmt->execute([(int) $user_id, (int) $user_id, (int) $limit, (int) $offset]);
             } else {
-                $query = "SELECT c.conversation_id, c.student_id, c.officer_id, c.subject, c.last_message_at,
-                                 c.is_archived_by_officer, c.created_at,
-                                 COALESCE(NULLIF(LTRIM(RTRIM(CONCAT(COALESCE(si.last_name, ''), ', ', COALESCE(si.first_name, '')))), ','), CAST(st.student_id AS VARCHAR(50))) as student_name,
-                                 COALESCE(cp.unread_count, 0) as unread_count
-                          FROM conversations c
-                          JOIN students st ON c.student_id = st.student_id
-                          LEFT JOIN student_information si ON st.student_id = si.student_id
-                          LEFT JOIN conversation_participants cp ON c.conversation_id = cp.conversation_id 
-                                 AND cp.user_id = ? AND cp.user_role = 'officer'
-                          WHERE c.officer_id = ? AND c.is_archived_by_officer = false
-                          ORDER BY c.last_message_at DESC NULLS LAST, c.created_at DESC
-                          LIMIT ? OFFSET ?";
+                $query = $baseSelect . " ORDER BY CASE WHEN c.last_message_at IS NULL THEN 1 ELSE 0 END,
+                                          c.last_message_at DESC, c.created_at DESC
+                                          OFFSET ? ROWS FETCH NEXT ? ROWS ONLY";
+                $stmt = $this->conn->prepare($query);
+                $stmt->execute([(int) $user_id, (int) $user_id, (int) $offset, (int) $limit]);
             }
-
-            $stmt = $this->conn->prepare($query);
-            $params = $user_role === 'student' 
-                ? [(int) $user_id, (int) $user_id, (int) $limit, (int) $offset]
-                : [(int) $user_id, (int) $user_id, (int) $limit, (int) $offset];
-
-            $stmt->execute($params);
             return $stmt->fetchAll(\PDO::FETCH_ASSOC);
         } catch (Exception $e) {
             error_log("Error getting user conversations: " . $e->getMessage());

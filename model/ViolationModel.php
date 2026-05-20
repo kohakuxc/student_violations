@@ -19,11 +19,16 @@ class ViolationModel
 
     public function __construct()
     {
+        global $conn;
+        if ($conn instanceof PDO) {
+            $this->conn = $conn;
+            return;
+        }
         include __DIR__ . '/../config/db_connection.php';
         $this->conn = $conn;
     }
 
-    public function addViolation($student_id, $officer_id, $violation_type_id, $description, $date_of_violation)
+    public function addViolation($student_id, $officer_id, $violation_type_id, $description, $date_of_violation, $is_self_harm = false)
     {
         try {
             $dupSql = $this->isPgsql()
@@ -61,10 +66,13 @@ class ViolationModel
                 ];
             }
 
-            $this->conn->beginTransaction();
+            $manageTransaction = !$this->conn->inTransaction();
+            if ($manageTransaction) {
+                $this->conn->beginTransaction();
+            }
 
-            $insertSql = "INSERT INTO violations (student_id, officer_id, violation_type, description, date_of_violation)
-                          VALUES (?, ?, ?, ?, ?)";
+            $insertSql = "INSERT INTO violations (student_id, officer_id, violation_type, description, date_of_violation, is_self_harm)
+                          VALUES (?, ?, ?, ?, ?, ?)";
             $stmt = $this->conn->prepare($insertSql);
             $stmt->execute([
                 (int) $student_id,
@@ -72,6 +80,7 @@ class ViolationModel
                 (int) $violation_type_id,
                 $description,
                 $date_of_violation,
+                $this->isPgsql() ? (bool) $is_self_harm : ($is_self_harm ? 1 : 0),
             ]);
 
             $newViolationId = (int) $this->conn->lastInsertId();
@@ -110,8 +119,8 @@ class ViolationModel
                     if ($majorTypeId) {
                         $majorDesc = 'Auto-escalation rule: Converted 3 minor offenses into 1 Major Offense - Category A.';
                         $majorInsert = $this->conn->prepare(
-                            "INSERT INTO violations (student_id, officer_id, violation_type, description, date_of_violation)
-                             VALUES (?, ?, ?, ?, ?)"
+                             "INSERT INTO violations (student_id, officer_id, violation_type, description, date_of_violation, is_self_harm)
+                              VALUES (?, ?, ?, ?, ?, ?)"
                         );
                         $majorInsert->execute([
                             (int) $student_id,
@@ -119,6 +128,7 @@ class ViolationModel
                             $majorTypeId,
                             $majorDesc,
                             $date_of_violation,
+                            $this->isPgsql() ? false : 0,
                         ]);
                         $majorViolationId = (int) $this->conn->lastInsertId();
 
@@ -160,7 +170,9 @@ class ViolationModel
                 }
             }
 
-            $this->conn->commit();
+            if ($manageTransaction && $this->conn->inTransaction()) {
+                $this->conn->commit();
+            }
 
             return [
                 'success' => true,
@@ -168,7 +180,9 @@ class ViolationModel
                 'violation_id' => $newViolationId,
             ];
         } catch (PDOException $e) {
-            $this->conn->rollBack();
+            if ($this->conn->inTransaction()) {
+                $this->conn->rollBack();
+            }
             error_log('Add Violation Error: ' . $e->getMessage());
             return [
                 'success' => false,

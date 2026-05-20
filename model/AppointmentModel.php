@@ -33,6 +33,56 @@ class AppointmentModel
         return $this->driverName() === 'pgsql';
     }
 
+    private function hasAppointmentForDate($student_id, $appointment_date, $excludeAppointmentId = null)
+    {
+        $query = "SELECT COUNT(*) AS count FROM appointments
+                  WHERE student_id = ? AND appointment_date = ?";
+        $params = [(int) $student_id, (string) $appointment_date];
+        if ($excludeAppointmentId) {
+            $query .= " AND appointment_id != ?";
+            $params[] = (int) $excludeAppointmentId;
+        }
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute($params);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        return ((int) ($result['count'] ?? 0)) > 0;
+    }
+
+    public function studentHasAppointmentOnDate($student_id, $appointment_date, $excludeAppointmentId = null)
+    {
+        return $this->hasAppointmentForDate($student_id, $appointment_date, $excludeAppointmentId);
+    }
+
+    private function isAppointmentLocked($appointment_id)
+    {
+        $stmt = $this->conn->prepare("SELECT locked_at, status FROM appointments WHERE appointment_id = ?");
+        $stmt->execute([(int) $appointment_id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) {
+            return false;
+        }
+        if (!empty($row['locked_at'])) {
+            return true;
+        }
+        return in_array($row['status'] ?? '', ['cancelled', 'rejected'], true);
+    }
+
+    private function lockAppointment($appointment_id, $lockedByRole = null, $lockedById = null)
+    {
+        $query = "UPDATE appointments
+                  SET locked_at = CURRENT_TIMESTAMP,
+                      locked_by_role = ?,
+                      locked_by_id = ?,
+                      updated_at = CURRENT_TIMESTAMP
+                  WHERE appointment_id = ?";
+        $stmt = $this->conn->prepare($query);
+        return $stmt->execute([
+            $lockedByRole !== null ? (string) $lockedByRole : null,
+            $lockedById !== null ? (int) $lockedById : null,
+            (int) $appointment_id,
+        ]);
+    }
+
     public function __construct()
     {
         global $conn;
@@ -73,7 +123,7 @@ class AppointmentModel
      * Create a new appointment
      */
     // Check your table structure
-    public function createAppointment($student_id, $category_id, $subcategory_id, $description, $scheduled_datetime, $evidence_image = null)
+    public function createAppointment($student_id, $category_id, $subcategory_id, $description, $scheduled_datetime, $evidence_image = null, $is_self_harm = false)
     {
         try {
             $log_file = __DIR__ . '/../logs/appointments.log';
@@ -90,17 +140,30 @@ class AppointmentModel
                 return false;
             }
 
+            $appointment_date = date('Y-m-d', strtotime((string) $scheduled_datetime));
+            if (!$appointment_date) {
+                $log('MODEL ERROR: Invalid appointment date', true);
+                return false;
+            }
+
+            if ($this->hasAppointmentForDate($student_id, $appointment_date)) {
+                $log('MODEL ERROR: Student already has appointment for date ' . $appointment_date, true);
+                return false;
+            }
+
             $query = "INSERT INTO appointments (
                     student_id,
                     officer_id,
                     category_id,
                     subcategory_id,
                     description,
+                    appointment_date,
                     scheduled_date,
                     evidence_image,
                     status,
+                    is_self_harm,
                     created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)";
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)";
 
             $log('SQL Query prepared');
 
@@ -120,9 +183,11 @@ class AppointmentModel
                 (int) $category_id,
                 (int) $subcategory_id,
                 (string) $description,
+                (string) $appointment_date,
                 (string) $scheduled_datetime,
                 (string) $evidence_image,
-                (string) $status
+                (string) $status,
+                $this->isPgsql() ? (bool) $is_self_harm : ($is_self_harm ? 1 : 0),
             ]);
 
             if (!$result) {
@@ -131,8 +196,9 @@ class AppointmentModel
                 return false;
             }
 
+            $appointmentId = (int) $this->conn->lastInsertId();
             $log('SUCCESS: Appointment created');
-            return true;
+            return $appointmentId > 0 ? $appointmentId : true;
 
         } catch (Exception $e) {
             $log_file = __DIR__ . '/../logs/appointments.log';
@@ -563,15 +629,29 @@ class AppointmentModel
 }
 
     // Update appointment status
-    public function updateAppointmentStatus($appointment_id, $status, $notes = null)
+    public function updateAppointmentStatus($appointment_id, $status, $lockedByRole = null, $lockedById = null)
     {
         try {
-            $query = "UPDATE appointments 
-                      SET status = ?, updated_at = CURRENT_TIMESTAMP 
-                      WHERE appointment_id = ?";
+            if ($this->isAppointmentLocked($appointment_id)) {
+                return false;
+            }
 
+            $lockNow = in_array($status, ['cancelled', 'rejected'], true);
+            $setParts = ['status = ?', 'updated_at = CURRENT_TIMESTAMP'];
+            $params = [(string) $status];
+
+            if ($lockNow) {
+                $setParts[] = 'locked_at = CURRENT_TIMESTAMP';
+                $setParts[] = 'locked_by_role = ?';
+                $setParts[] = 'locked_by_id = ?';
+                $params[] = $lockedByRole !== null ? (string) $lockedByRole : null;
+                $params[] = $lockedById !== null ? (int) $lockedById : null;
+            }
+
+            $query = "UPDATE appointments SET " . implode(', ', $setParts) . " WHERE appointment_id = ?";
+            $params[] = (int) $appointment_id;
             $stmt = $this->conn->prepare($query);
-            return $stmt->execute([$status, $appointment_id]);
+            return $stmt->execute($params);
         } catch (Exception $e) {
             error_log("Exception in updateAppointmentStatus: " . $e->getMessage());
             return false;
@@ -582,6 +662,9 @@ class AppointmentModel
     public function assignOfficer($appointment_id, $officer_id)
     {
         try {
+            if ($this->isAppointmentLocked($appointment_id)) {
+                return false;
+            }
             $stmt = $this->conn->prepare(
                 "UPDATE appointments SET officer_id = ?, updated_at = CURRENT_TIMESTAMP WHERE appointment_id = ?"
             );
@@ -596,6 +679,9 @@ class AppointmentModel
     public function addAppointmentNote($appointment_id, $note_text, $officer_id = null)
     {
         try {
+            if ($this->isAppointmentLocked($appointment_id)) {
+                return false;
+            }
             $stmt = $this->conn->prepare(
                                 "INSERT INTO appointment_notes (appointment_id, note_text, officer_id, created_at)
                   VALUES (?, ?, ?, CURRENT_TIMESTAMP)"
@@ -691,17 +777,28 @@ class AppointmentModel
     public function rescheduleAppointment($appointment_id, $new_date)
     {
         try {
+            if ($this->isAppointmentLocked($appointment_id)) {
+                return false;
+            }
             $this->conn->beginTransaction();
 
             // Get current appointment
             $current = $this->getAppointmentById($appointment_id);
 
             // Update current to rescheduled
+            $appointment_date = date('Y-m-d', strtotime((string) $new_date));
+            if (!$appointment_date) {
+                throw new Exception('Invalid appointment date');
+            }
+            if ($this->hasAppointmentForDate($current['student_id'] ?? 0, $appointment_date, $appointment_id)) {
+                throw new Exception('Student already has an appointment on that day.');
+            }
+
             $query = "UPDATE appointments 
-                      SET status = 'rescheduled', scheduled_date = ?, updated_at = CURRENT_TIMESTAMP
+                      SET status = 'rescheduled', scheduled_date = ?, appointment_date = ?, updated_at = CURRENT_TIMESTAMP
                       WHERE appointment_id = ?";
             $stmt = $this->conn->prepare($query);
-            $stmt->execute([$new_date, $appointment_id]);
+            $stmt->execute([$new_date, $appointment_date, $appointment_id]);
 
             $this->conn->commit();
             return true;
@@ -833,7 +930,7 @@ class AppointmentModel
             $this->conn->beginTransaction();
 
             // Update appointment status
-            $updated = $this->updateAppointmentStatus($appointment_id, 'cancelled');
+            $updated = $this->updateAppointmentStatus($appointment_id, 'cancelled', 'student', $student_id);
             if (!$updated) {
                 throw new Exception('Failed to update appointment status');
             }
@@ -860,7 +957,7 @@ class AppointmentModel
             $this->conn->beginTransaction();
 
             // Update appointment status to rejected
-            $this->updateAppointmentStatus($appointment_id, 'rejected');
+            $this->updateAppointmentStatus($appointment_id, 'rejected', 'officer', $officer_id);
 
             // Add rejection reason as a note
             $this->addAppointmentNote($appointment_id, 'Rejected: ' . $reason, $officer_id);

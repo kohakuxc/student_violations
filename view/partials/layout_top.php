@@ -8,6 +8,8 @@ require_once __DIR__ . '/../../config/system_settings.php';
 require_once __DIR__ . '/../../config/db_connection.php';
 require_once __DIR__ . '/../../model/NotificationModel.php';
 require_once __DIR__ . '/../../model/MessageModel.php';
+require_once __DIR__ . '/../../helper/CsrfHelper.php';
+require_once __DIR__ . '/../../helper/AuthHelper.php';
 
 $notifications = [];
 $unreadCount = 0;
@@ -34,6 +36,7 @@ if (isset($_SESSION['officer_id'])) {
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title><?php echo htmlspecialchars($pageTitle); ?> - Student Violations System</title>
+    <meta name="csrf-token" content="<?php echo htmlspecialchars(csrfToken(), ENT_QUOTES, 'UTF-8'); ?>" />
 
     <!-- Your custom CSS -->
     <link rel="stylesheet" href="css/style.css?v=<?php echo urlencode((string) $styleVersion); ?>" />
@@ -386,6 +389,18 @@ if (isset($_SESSION['officer_id'])) {
                    href="index.php?page=settings">
                     <i class="fas fa-gear"></i> Settings
                 </a>
+                <?php if (canImportExcel()): ?>
+                    <a class="sidebar-link <?php echo ($_GET['page'] ?? null) === 'import_violations' ? 'active' : ''; ?>" 
+                       href="index.php?page=import_violations">
+                        <i class="fas fa-file-excel"></i> Excel Import
+                    </a>
+                <?php endif; ?>
+                <?php if (isSuperAdminUser()): ?>
+                    <a class="sidebar-link <?php echo ($_GET['page'] ?? null) === 'admin_management' ? 'active' : ''; ?>" 
+                       href="index.php?page=admin_management">
+                        <i class="fas fa-user-shield"></i> Superadmin
+                    </a>
+                <?php endif; ?>
             </nav>
         </aside>
 
@@ -526,7 +541,10 @@ if (isset($_SESSION['officer_id'])) {
                         function markNotificationAsRead(notificationId) {
                             fetch('api/notifications.php?action=markAsRead', {
                                 method: 'POST',
-                                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                                headers: {
+                                    'Content-Type': 'application/x-www-form-urlencoded',
+                                    'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || ''
+                                },
                                 body: 'notification_id=' + notificationId
                             })
                                 .then(r => r.json())
@@ -543,7 +561,10 @@ if (isset($_SESSION['officer_id'])) {
                         // Mark all as read
                         function markAllAsRead() {
                             fetch('api/notifications.php?action=markAllAsRead', {
-                                method: 'POST'
+                                method: 'POST',
+                                headers: {
+                                    'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || ''
+                                }
                             })
                                 .then(r => r.json())
                                 .then(data => {

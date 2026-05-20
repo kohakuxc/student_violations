@@ -515,10 +515,17 @@ function submitApprove() {
     const id   = document.getElementById('approveAppointmentId').value;
     const note = document.getElementById('approveNote').value;
 
+    if (!window.confirm('Approve this appointment?')) {
+        return;
+    }
+
     fetch('api/appointments.php?action=approveAppointment', {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({appointment_id: id, note: note})
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || ''
+        },
+        body: JSON.stringify({appointment_id: id, note: note, contact_website: ''})
     })
     .then(r => r.json())
     .then(data => {
@@ -544,11 +551,17 @@ function submitReject() {
     const id     = document.getElementById('rejectAppointmentId').value;
     const reason = document.getElementById('rejectReason').value.trim();
     if (!reason) { alert('Please provide a rejection reason.'); return; }
+    if (!window.confirm('Reject this appointment?')) {
+        return;
+    }
 
     fetch('api/appointments.php?action=rejectAppointment', {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({appointment_id: id, reason: reason})
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || ''
+        },
+        body: JSON.stringify({appointment_id: id, reason: reason, contact_website: ''})
     })
     .then(r => r.json())
     .then(data => {
@@ -574,11 +587,17 @@ function submitNote() {
     const id   = document.getElementById('noteAppointmentId').value;
     const note = document.getElementById('noteText').value.trim();
     if (!note) { alert('Please enter a note.'); return; }
+    if (!window.confirm('Add this note to the appointment?')) {
+        return;
+    }
 
     fetch('api/appointments.php?action=addNote', {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({appointment_id: id, note: note})
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || ''
+        },
+        body: JSON.stringify({appointment_id: id, note: note, contact_website: ''})
     })
     .then(r => r.json())
     .then(data => {
@@ -607,10 +626,17 @@ function submitStatusUpdate() {
     const status = document.getElementById('newStatus').value;
     const note   = document.getElementById('statusNote').value;
 
+    if (!window.confirm('Update this appointment status?')) {
+        return;
+    }
+
     fetch('api/appointments.php?action=updateStatus', {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({appointment_id: id, status: status, note: note})
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || ''
+        },
+        body: JSON.stringify({appointment_id: id, status: status, note: note, contact_website: ''})
     })
     .then(r => r.json())
     .then(data => {
@@ -660,4 +686,3 @@ document.addEventListener('DOMContentLoaded', function () {
 
 </body>
 </html>
-

@@ -31,6 +31,29 @@
     })();
 </script>
 
+<script>
+    (function () {
+        document.querySelectorAll('form[data-confirm]').forEach(function (form) {
+            form.addEventListener('submit', function (e) {
+                var message = form.getAttribute('data-confirm');
+                if (message && !window.confirm(message)) {
+                    e.preventDefault();
+                    return;
+                }
+                if (form.dataset.submitted === 'true') {
+                    e.preventDefault();
+                    return;
+                }
+                form.dataset.submitted = 'true';
+                var submitBtn = form.querySelector('button[type="submit"]');
+                if (submitBtn) {
+                    submitBtn.disabled = true;
+                }
+            });
+        });
+    })();
+</script>
+
 </body>
 
 </html>

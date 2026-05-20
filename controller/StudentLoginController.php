@@ -10,8 +10,10 @@ if (isset($_SESSION['student_id'])) {
 }
 
 include 'model/StudentAuthModel.php';
+include 'model/StudentAccountModel.php';
 
 $studentAuthModel = new StudentAuthModel();
+$studentAccountModel = new StudentAccountModel();
 $error = "";
 $login_url = "";
 
@@ -45,6 +47,10 @@ if (isset($_GET['code'])) {
             if (!$studentAuthModel->isValidEmailDomain($email)) {
                 redirectStudentError('Only @fairview.sti.edu.ph email addresses are allowed.');
             } else {
+                if (!$studentAccountModel->isEmailAllowed($email)) {
+                    redirectStudentError('Your student account is not enabled for access. Please contact the superadmin.');
+                }
+
                 $studentResult = $studentAuthModel->findOrCreateStudentByMicrosoftProfile($profile, $tokenResult['access_token']);
 
                 if (!empty($studentResult['success']) && !empty($studentResult['student'])) {

@@ -11,10 +11,21 @@ if (!isset($_SESSION['student_id']) && !isset($_SESSION['officer_id'])) {
 require_once __DIR__ . '/../config/db_connection.php';
 require_once __DIR__ . '/../model/AppointmentModel.php';
 require_once __DIR__ . '/../config/system_settings.php';
+require_once __DIR__ . '/../helper/CsrfHelper.php';
+require_once __DIR__ . '/../helper/TextGuard.php';
+require_once __DIR__ . '/../helper/RateLimiter.php';
+require_once __DIR__ . '/../helper/AuditLogger.php';
 
 $action = $_GET['action'] ?? null;
 $appointmentModel = new AppointmentModel();
 $settings = loadSystemSettings();
+$auditLogger = new AuditLogger();
+
+$writeActions = ['approveAppointment', 'rejectAppointment', 'addNote', 'updateStatus', 'cancelAppointment'];
+if (in_array($action, $writeActions, true)) {
+    $token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? ($_POST['csrf_token'] ?? '');
+    csrfRequireValidToken($token);
+}
 
 try {
     switch ($action) {
@@ -61,21 +72,43 @@ try {
             $data = json_decode(file_get_contents('php://input'), true) ?? [];
             $appointment_id = intval($data['appointment_id'] ?? $_POST['appointment_id'] ?? 0);
             $note_text = trim($data['note'] ?? $_POST['note'] ?? '');
+            $honeypot = trim((string) ($data['contact_website'] ?? $_POST['contact_website'] ?? ''));
             $officer_id = (int) $_SESSION['officer_id'];
+
+            if ($honeypot !== '') {
+                throw new Exception('Submission flagged as spam.');
+            }
 
             if (!$appointment_id) {
                 throw new Exception('Appointment ID required');
             }
 
-            $appointmentModel->assignOfficer($appointment_id, $officer_id);
-            $appointmentModel->updateAppointmentStatus($appointment_id, 'approved');
+            if (!rateLimitCheck('approve_appointment_' . $officer_id, 10, 60)) {
+                throw new Exception('Too many requests. Please wait a moment.');
+            }
+
+            if (!$appointmentModel->assignOfficer($appointment_id, $officer_id)) {
+                throw new Exception('Unable to assign officer for this appointment.');
+            }
+            if (!$appointmentModel->updateAppointmentStatus($appointment_id, 'approved')) {
+                throw new Exception('Unable to update appointment status.');
+            }
 
             if ($note_text !== '') {
-                $appointmentModel->addAppointmentNote($appointment_id, $note_text, $officer_id);
+                $validation = validateFreeText($note_text, 5, 500);
+                if (!$validation['valid']) {
+                    throw new Exception($validation['message']);
+                }
+                if (!$appointmentModel->addAppointmentNote($appointment_id, $validation['value'], $officer_id)) {
+                    throw new Exception('Unable to add appointment note.');
+                }
             }
 
             // Create appointment approved notification
             $appointmentModel->createAppointmentNotification($appointment_id, 'approved', $officer_id, $_SESSION['officer_name'] ?? 'Staff');
+            $auditLogger->log($officer_id, 'officer', 'appointment_status_updated', 'appointment', $appointment_id, [
+                'status' => 'approved'
+            ]);
 
             echo json_encode(['success' => true, 'message' => 'Appointment approved successfully']);
             break;
@@ -87,7 +120,12 @@ try {
             $data = json_decode(file_get_contents('php://input'), true) ?? [];
             $appointment_id = intval($data['appointment_id'] ?? $_POST['appointment_id'] ?? 0);
             $reason = trim($data['reason'] ?? $_POST['reason'] ?? '');
+            $honeypot = trim((string) ($data['contact_website'] ?? $_POST['contact_website'] ?? ''));
             $officer_id = (int) $_SESSION['officer_id'];
+
+            if ($honeypot !== '') {
+                throw new Exception('Submission flagged as spam.');
+            }
 
             if (!$appointment_id) {
                 throw new Exception('Appointment ID required');
@@ -96,10 +134,20 @@ try {
                 throw new Exception('Rejection reason is required');
             }
 
-            $appointmentModel->rejectAppointment($appointment_id, $reason, $officer_id);
+            $validation = validateFreeText($reason, 5, 500);
+            if (!$validation['valid']) {
+                throw new Exception($validation['message']);
+            }
+
+            if (!$appointmentModel->rejectAppointment($appointment_id, $validation['value'], $officer_id)) {
+                throw new Exception('Unable to reject appointment.');
+            }
 
             // Create appointment rejected notification
             $appointmentModel->createAppointmentNotification($appointment_id, 'rejected', $officer_id, $_SESSION['officer_name'] ?? 'Staff');
+            $auditLogger->log($officer_id, 'officer', 'appointment_status_updated', 'appointment', $appointment_id, [
+                'status' => 'rejected'
+            ]);
 
             echo json_encode(['success' => true, 'message' => 'Appointment rejected']);
             break;
@@ -111,7 +159,12 @@ try {
             $data = json_decode(file_get_contents('php://input'), true) ?? [];
             $appointment_id = intval($data['appointment_id'] ?? $_POST['appointment_id'] ?? 0);
             $note_text = trim($data['note'] ?? $_POST['note'] ?? '');
+            $honeypot = trim((string) ($data['contact_website'] ?? $_POST['contact_website'] ?? ''));
             $officer_id = (int) $_SESSION['officer_id'];
+
+            if ($honeypot !== '') {
+                throw new Exception('Submission flagged as spam.');
+            }
 
             if (!$appointment_id) {
                 throw new Exception('Appointment ID required');
@@ -120,11 +173,17 @@ try {
                 throw new Exception('Note text is required');
             }
 
-            $result = $appointmentModel->addAppointmentNote($appointment_id, $note_text, $officer_id);
+            $validation = validateFreeText($note_text, 5, 500);
+            if (!$validation['valid']) {
+                throw new Exception($validation['message']);
+            }
+
+            $result = $appointmentModel->addAppointmentNote($appointment_id, $validation['value'], $officer_id);
             if (!$result) {
                 throw new Exception('Failed to add note');
             }
 
+            $auditLogger->log($officer_id, 'officer', 'appointment_note_added', 'appointment', $appointment_id);
             echo json_encode(['success' => true, 'message' => 'Note added successfully']);
             break;
 
@@ -136,7 +195,12 @@ try {
             $appointment_id = intval($data['appointment_id'] ?? $_POST['appointment_id'] ?? 0);
             $status = trim($data['status'] ?? $_POST['status'] ?? '');
             $note_text = trim($data['note'] ?? $_POST['note'] ?? '');
+            $honeypot = trim((string) ($data['contact_website'] ?? $_POST['contact_website'] ?? ''));
             $officer_id = (int) $_SESSION['officer_id'];
+
+            if ($honeypot !== '') {
+                throw new Exception('Submission flagged as spam.');
+            }
 
             $allowed_statuses = ['pending', 'approved', 'in_progress', 'completed', 'rejected', 'cancelled', 'rescheduled'];
             if (!$appointment_id) {
@@ -146,10 +210,20 @@ try {
                 throw new Exception('Invalid status value');
             }
 
-            $appointmentModel->updateAppointmentStatus($appointment_id, $status);
+            if (!rateLimitCheck('status_update_' . $officer_id, 10, 60)) {
+                throw new Exception('Too many requests. Please wait a moment.');
+            }
+
+            if (!$appointmentModel->updateAppointmentStatus($appointment_id, $status, 'officer', $officer_id)) {
+                throw new Exception('Unable to update appointment status.');
+            }
 
             if ($note_text !== '') {
-                $appointmentModel->addAppointmentNote($appointment_id, $note_text, $officer_id);
+                $validation = validateFreeText($note_text, 5, 500);
+                if (!$validation['valid']) {
+                    throw new Exception($validation['message']);
+                }
+                $appointmentModel->addAppointmentNote($appointment_id, $validation['value'], $officer_id);
             }
 
             // Create student notification for appointment response statuses
@@ -157,6 +231,9 @@ try {
                 $appointmentModel->createAppointmentNotification($appointment_id, $status, $officer_id, $_SESSION['officer_name'] ?? 'Staff');
             }
 
+            $auditLogger->log($officer_id, 'officer', 'appointment_status_updated', 'appointment', $appointment_id, [
+                'status' => $status
+            ]);
             echo json_encode(['success' => true, 'message' => 'Status updated successfully']);
             break;
 
@@ -164,6 +241,11 @@ try {
             $data = json_decode(file_get_contents('php://input'), true) ?? [];
             $appointment_id = intval($data['appointment_id'] ?? $_POST['appointment_id'] ?? 0);
             $reason = trim($data['reason'] ?? $_POST['reason'] ?? '');
+            $honeypot = trim((string) ($data['contact_website'] ?? $_POST['contact_website'] ?? ''));
+
+            if ($honeypot !== '') {
+                throw new Exception('Submission flagged as spam.');
+            }
 
             if (!$appointment_id) {
                 throw new Exception('Appointment ID required');
@@ -188,7 +270,16 @@ try {
                 throw new Exception('Invalid user context for cancellation');
             }
 
-            $ok = $appointmentModel->cancelAppointment($appointment_id, $reason, $created_by);
+            $validation = validateFreeText($reason, 5, 500);
+            if (!$validation['valid']) {
+                throw new Exception($validation['message']);
+            }
+
+            if (!rateLimitCheck('cancel_appointment_' . $created_by, 6, 120)) {
+                throw new Exception('Too many requests. Please wait a moment.');
+            }
+
+            $ok = $appointmentModel->cancelAppointment($appointment_id, $validation['value'], $created_by);
             if (!$ok) {
                 throw new Exception('Failed to cancel appointment');
             }
@@ -198,6 +289,9 @@ try {
                 $appointmentModel->createAppointmentNotification($appointment_id, 'cancelled', (int) $_SESSION['officer_id'], $_SESSION['officer_name'] ?? 'Staff');
             }
 
+            $auditLogger->log($created_by, isset($_SESSION['officer_id']) ? 'officer' : 'student', 'appointment_status_updated', 'appointment', $appointment_id, [
+                'status' => 'cancelled'
+            ]);
             echo json_encode(['success' => true, 'message' => 'Appointment cancelled']);
             break;
 

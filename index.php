@@ -77,6 +77,14 @@ switch ($page) {
         }
         break;
 
+    case 'admin_forgot_password':
+        include 'controller/AdminForgotPasswordController.php';
+        break;
+
+    case 'admin_reset_password':
+        include 'controller/AdminResetPasswordController.php';
+        break;
+
     case 'dashboard':
         // Officer dashboard - check if logged in
         if (!isset($_SESSION['officer_id'])) {
@@ -116,6 +124,22 @@ switch ($page) {
             exit();
         }
         include 'controller/SettingsController.php';
+        break;
+
+    case 'admin_management':
+        if (!isset($_SESSION['officer_id'])) {
+            header("Location: index.php?page=login");
+            exit();
+        }
+        include 'controller/AdminManagementController.php';
+        break;
+
+    case 'import_violations':
+        if (!isset($_SESSION['officer_id'])) {
+            header("Location: index.php?page=login");
+            exit();
+        }
+        include 'controller/ImportViolationsController.php';
         break;
 
     // ===== NEW APPOINTMENT ROUTES =====
@@ -175,6 +199,22 @@ switch ($page) {
             exit();
         }
         include 'controller/StudentDashboardController.php';
+        break;
+
+    case 'student_report':
+        if (!isset($_SESSION['student_id'])) {
+            header("Location: index.php?page=login");
+            exit();
+        }
+        include 'controller/StudentReportController.php';
+        break;
+
+    case 'report_triage':
+        if (!isset($_SESSION['officer_id'])) {
+            header("Location: index.php?page=login");
+            exit();
+        }
+        include 'controller/ReportTriageController.php';
         break;
 
     // Default - redirect to login

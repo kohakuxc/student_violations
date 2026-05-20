@@ -261,6 +261,7 @@ if (!$isOfficer) {
             <div class="chat-empty">No messages yet.</div>
         </div>
         <form id="chatForm" class="chat-compose">
+            <input type="text" id="messageHoneypot" name="contact_website" value="" style="display:none" tabindex="-1" autocomplete="off">
             <textarea id="messageInput" placeholder="Type your message..." disabled></textarea>
             <button type="submit" id="sendBtn" disabled>Send</button>
         </form>
@@ -388,7 +389,10 @@ if (!$isOfficer) {
         const body = new URLSearchParams({ conversation_id: String(conversationId) });
         await fetch('api/messages.php?action=markConversationAsRead', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || ''
+            },
             body: body.toString()
         });
     }
@@ -415,14 +419,21 @@ if (!$isOfficer) {
     }
 
     async function sendMessage(text) {
+        if (!window.confirm('Send this message?')) {
+            return;
+        }
         const body = new URLSearchParams({
             conversation_id: String(selectedConversationId),
-            message_body: text
+            message_body: text,
+            contact_website: document.getElementById('messageHoneypot')?.value || ''
         });
 
         const res = await fetch('api/messages.php?action=sendMessage', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || ''
+            },
             body: body.toString()
         });
         const data = await res.json();
@@ -436,6 +447,9 @@ if (!$isOfficer) {
         if (currentUserRole !== 'student' || assignedOfficerId <= 0 || studentId <= 0) {
             return;
         }
+        if (!window.confirm('Start a new conversation with your assigned officer?')) {
+            return;
+        }
 
         const body = new URLSearchParams({
             officer_id: String(assignedOfficerId),
@@ -444,7 +458,10 @@ if (!$isOfficer) {
 
         const res = await fetch('api/messages.php?action=getOrCreateConversation', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || ''
+            },
             body: body.toString()
         });
         const data = await res.json();
