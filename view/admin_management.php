@@ -18,7 +18,7 @@
     <div class="col-lg-6">
         <div class="card">
             <div class="card-header">
-                <h5 class="mb-0">Create Admin</h5>
+                <h5 class="mb-0 text-white" >Create Admin</h5>
             </div>
             <div class="card-body">
                 <form method="POST" action="index.php?page=admin_management" data-confirm="Create this admin account?">
@@ -65,7 +65,7 @@
 
         <div class="card mt-4">
             <div class="card-header">
-                <h5 class="mb-0">Student Access List</h5>
+                <h5 class="mb-0 text-white">Student Access List</h5>
             </div>
             <div class="card-body">
                 <form method="POST" action="index.php?page=admin_management" data-confirm="Add these students to the access list?">
@@ -81,6 +81,25 @@
                     <label for="bulk_emails">Student emails (comma or newline separated)</label>
                     <textarea id="bulk_emails" name="bulk_emails" rows="4" placeholder="student1@fairview.sti.edu.ph&#10;student2@fairview.sti.edu.ph"></textarea>
                     <button type="submit" class="btn btn-primary mt-2">Add / Enable Students</button>
+                </form>
+
+                <hr style="margin: 20px 0;">
+
+                <form method="POST" action="index.php?page=admin_management" enctype="multipart/form-data" data-confirm="Import student emails from this file?">
+                    <?php
+                        $formKey = 'student_access_import';
+                        $formToken = csrfGenerateFormToken($formKey);
+                    ?>
+                    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrfToken(), ENT_QUOTES, 'UTF-8'); ?>">
+                    <input type="hidden" name="form_key" value="<?php echo htmlspecialchars($formKey, ENT_QUOTES, 'UTF-8'); ?>">
+                    <input type="hidden" name="form_token" value="<?php echo htmlspecialchars($formToken, ENT_QUOTES, 'UTF-8'); ?>">
+                    <input type="hidden" name="action" value="import_student_accounts">
+
+                    <label for="import_file">Upload student email file</label>
+                    <input type="file" id="import_file" name="import_file" accept=".csv,.xlsx" required>
+                    <small class="text-muted">Use a CSV or XLSX file with one column only. The first row may be a header such as email or student_email.</small>
+
+                    <button type="submit" class="btn btn-secondary mt-2">Import File</button>
                 </form>
 
                 <div style="margin-top:16px;">
@@ -133,7 +152,7 @@
     <div class="col-lg-6">
         <div class="card">
             <div class="card-header">
-                <h5 class="mb-0">Admin Accounts</h5>
+                <h5 class="mb-0 text-white">Admin Accounts</h5>
             </div>
             <div class="card-body">
                 <table class="table table-striped">
@@ -208,7 +227,7 @@
 
         <div class="card mt-4">
             <div class="card-header">
-                <h5 class="mb-0">Recent Audit Logs</h5>
+                <h5 class="mb-0 text-white">Recent Audit Logs</h5>
             </div>
             <div class="card-body">
                 <div style="max-height:260px;overflow:auto;">

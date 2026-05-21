@@ -111,6 +111,22 @@ UPDATE appointments
 SET appointment_date = CAST(scheduled_date AS date)
 WHERE appointment_date IS NULL;
 
+WITH ranked_appointments AS (
+    SELECT
+        appointment_id,
+        ROW_NUMBER() OVER (
+            PARTITION BY student_id, appointment_date
+            ORDER BY created_at DESC, appointment_id DESC
+        ) AS rn
+    FROM appointments
+    WHERE appointment_date IS NOT NULL
+)
+UPDATE appointments
+SET appointment_date = NULL
+FROM ranked_appointments
+WHERE appointments.appointment_id = ranked_appointments.appointment_id
+  AND ranked_appointments.rn > 1;
+
 UPDATE appointments
 SET locked_at = COALESCE(locked_at, now()),
     locked_by_role = COALESCE(locked_by_role, 'system')

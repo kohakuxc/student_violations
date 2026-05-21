@@ -77,5 +77,8 @@ if (!function_exists('csrfRequireValidToken')) {
                 throw new Exception('Form submission already processed. Please refresh and try again.');
             }
         }
+        if (empty($_SESSION['csrf_token'])) {
+            $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+        }
     }
 }

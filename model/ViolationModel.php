@@ -31,6 +31,9 @@ class ViolationModel
     public function addViolation($student_id, $officer_id, $violation_type_id, $description, $date_of_violation, $is_self_harm = false)
     {
         try {
+            $boolValue = filter_var($is_self_harm, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE);
+            $isSelfHarmBool = ($boolValue === null) ? false : $boolValue;
+
             $dupSql = $this->isPgsql()
                 ? "SELECT violation_id FROM violations
                     WHERE student_id = ?
@@ -71,19 +74,33 @@ class ViolationModel
                 $this->conn->beginTransaction();
             }
 
-            $insertSql = "INSERT INTO violations (student_id, officer_id, violation_type, description, date_of_violation, is_self_harm)
-                          VALUES (?, ?, ?, ?, ?, ?)";
-            $stmt = $this->conn->prepare($insertSql);
-            $stmt->execute([
-                (int) $student_id,
-                (int) $officer_id,
-                (int) $violation_type_id,
-                $description,
-                $date_of_violation,
-                $this->isPgsql() ? (bool) $is_self_harm : ($is_self_harm ? 1 : 0),
-            ]);
-
-            $newViolationId = (int) $this->conn->lastInsertId();
+            if ($this->isPgsql()) {
+                $insertSql = "INSERT INTO violations (student_id, officer_id, violation_type, description, date_of_violation, is_self_harm)
+                              VALUES (?, ?, ?, ?, ?, ?)
+                              RETURNING violation_id";
+                $stmt = $this->conn->prepare($insertSql);
+                $stmt->bindValue(1, (int) $student_id, PDO::PARAM_INT);
+                $stmt->bindValue(2, (int) $officer_id, PDO::PARAM_INT);
+                $stmt->bindValue(3, (int) $violation_type_id, PDO::PARAM_INT);
+                $stmt->bindValue(4, $description, PDO::PARAM_STR);
+                $stmt->bindValue(5, $date_of_violation, PDO::PARAM_STR);
+                $stmt->bindValue(6, $isSelfHarmBool, PDO::PARAM_BOOL);
+                $stmt->execute();
+                $newViolationId = (int) $stmt->fetchColumn();
+            } else {
+                $insertSql = "INSERT INTO violations (student_id, officer_id, violation_type, description, date_of_violation, is_self_harm)
+                              VALUES (?, ?, ?, ?, ?, ?)";
+                $stmt = $this->conn->prepare($insertSql);
+                $stmt->execute([
+                    (int) $student_id,
+                    (int) $officer_id,
+                    (int) $violation_type_id,
+                    $description,
+                    $date_of_violation,
+                    $is_self_harm ? 1 : 0,
+                ]);
+                $newViolationId = (int) $this->conn->lastInsertId();
+            }
 
             // Determine severity of the violation type
             $sevStmt = $this->conn->prepare("SELECT severity_level FROM violation_types WHERE violation_type_id = ?");
@@ -118,19 +135,35 @@ class ViolationModel
 
                     if ($majorTypeId) {
                         $majorDesc = 'Auto-escalation rule: Converted 3 minor offenses into 1 Major Offense - Category A.';
-                        $majorInsert = $this->conn->prepare(
-                             "INSERT INTO violations (student_id, officer_id, violation_type, description, date_of_violation, is_self_harm)
-                              VALUES (?, ?, ?, ?, ?, ?)"
-                        );
-                        $majorInsert->execute([
-                            (int) $student_id,
-                            (int) $officer_id,
-                            $majorTypeId,
-                            $majorDesc,
-                            $date_of_violation,
-                            $this->isPgsql() ? false : 0,
-                        ]);
-                        $majorViolationId = (int) $this->conn->lastInsertId();
+                        if ($this->isPgsql()) {
+                            $majorInsert = $this->conn->prepare(
+                                 "INSERT INTO violations (student_id, officer_id, violation_type, description, date_of_violation, is_self_harm)
+                                  VALUES (?, ?, ?, ?, ?, ?)
+                                  RETURNING violation_id"
+                            );
+                                        $majorInsert->bindValue(1, (int) $student_id, PDO::PARAM_INT);
+                                        $majorInsert->bindValue(2, (int) $officer_id, PDO::PARAM_INT);
+                                        $majorInsert->bindValue(3, $majorTypeId, PDO::PARAM_INT);
+                                        $majorInsert->bindValue(4, $majorDesc, PDO::PARAM_STR);
+                                        $majorInsert->bindValue(5, $date_of_violation, PDO::PARAM_STR);
+                                        $majorInsert->bindValue(6, false, PDO::PARAM_BOOL);
+                                        $majorInsert->execute();
+                            $majorViolationId = (int) $majorInsert->fetchColumn();
+                        } else {
+                            $majorInsert = $this->conn->prepare(
+                                 "INSERT INTO violations (student_id, officer_id, violation_type, description, date_of_violation, is_self_harm)
+                                  VALUES (?, ?, ?, ?, ?, ?)"
+                            );
+                            $majorInsert->execute([
+                                (int) $student_id,
+                                (int) $officer_id,
+                                $majorTypeId,
+                                $majorDesc,
+                                $date_of_violation,
+                                0,
+                            ]);
+                            $majorViolationId = (int) $this->conn->lastInsertId();
+                        }
 
                         $now = date('Y-m-d H:i:s');
                         $updateSql = "UPDATE violations
@@ -138,12 +171,15 @@ class ViolationModel
                                       WHERE violation_id = ?";
                         $updateStmt = $this->conn->prepare($updateSql);
                         foreach ($sourceMinorIds as $sid) {
-                            $updateStmt->execute([
-                                $this->isPgsql() ? true : 1,
-                                $now,
-                                $majorViolationId,
-                                $sid,
-                            ]);
+                            if ($this->isPgsql()) {
+                                $updateStmt->bindValue(1, true, PDO::PARAM_BOOL);
+                            } else {
+                                $updateStmt->bindValue(1, 1, PDO::PARAM_INT);
+                            }
+                            $updateStmt->bindValue(2, $now, PDO::PARAM_STR);
+                            $updateStmt->bindValue(3, $majorViolationId, PDO::PARAM_INT);
+                            $updateStmt->bindValue(4, $sid, PDO::PARAM_INT);
+                            $updateStmt->execute();
                         }
 
                         $escStmt = $this->conn->prepare(
@@ -157,7 +193,11 @@ class ViolationModel
                             'minor_3_to_major_a',
                             $now,
                         ]);
-                        $escalationId = (int) $this->conn->lastInsertId();
+                        if ($this->isPgsql()) {
+                            $escalationId = (int) $this->conn->lastInsertId('violation_escalations_escalation_id_seq');
+                        } else {
+                            $escalationId = (int) $this->conn->lastInsertId();
+                        }
 
                         $itemStmt = $this->conn->prepare(
                             "INSERT INTO violation_escalation_items (escalation_id, source_violation_id, created_at)
@@ -183,10 +223,32 @@ class ViolationModel
             if ($this->conn->inTransaction()) {
                 $this->conn->rollBack();
             }
-            error_log('Add Violation Error: ' . $e->getMessage());
+            $errorMessage = $e->getMessage();
+            $sqlState = (string) $e->getCode();
+            $debugMessage = trim($sqlState . ': ' . $errorMessage);
+
+            if ($sqlState === '23503') {
+                if (stripos($errorMessage, 'student_id') !== false) {
+                    $userMessage = 'Failed to record violation: the student number does not match an existing student.';
+                } elseif (stripos($errorMessage, 'violation_type') !== false) {
+                    $userMessage = 'Failed to record violation: the violation type does not match an active violation type.';
+                } else {
+                    $userMessage = 'Failed to record violation: one of the selected references does not exist.';
+                }
+            } elseif ($sqlState === '23502') {
+                $userMessage = 'Failed to record violation: a required field was missing.';
+            } elseif ($sqlState === '23505') {
+                $userMessage = 'Failed to record violation: this violation already exists.';
+            } else {
+                $userMessage = 'Failed to record violation. Please try again.';
+            }
+
+            error_log('Add Violation Error: ' . $errorMessage);
             return [
                 'success' => false,
-                'message' => 'Failed to record violation. Please try again.'
+                'message' => $userMessage,
+                'debug_message' => $debugMessage,
+                'sql_state' => $sqlState
             ];
         }
     }
@@ -195,6 +257,124 @@ class ViolationModel
     // For brevity in this replacement, reimplement only the methods we need to support pagination, sorting and search.
 
     public function getAllViolations($sort = 'created_at', $search = null, $dir = 'DESC', $limit = null, $offset = 0)
+    {
+        try {
+            $allowed = [
+                'created_at' => 'created_at',
+                'date_of_violation' => 'date_of_violation',
+                'violation_type' => 'type_name'
+            ];
+
+            $orderBy = isset($allowed[$sort]) ? $allowed[$sort] : $allowed['created_at'];
+            $orderDir = (strtoupper($dir) === 'ASC') ? 'ASC' : 'DESC';
+
+            $where = $this->isEscalatedFalseCondition('v');
+            $params = [];
+            if (!empty($search)) {
+                $studentNameExpr = "COALESCE(NULLIF(LTRIM(RTRIM(CONCAT(COALESCE(si.last_name, ''), ', ', COALESCE(si.first_name, '')))), ','), '')";
+                $where .= " AND (LOWER(v.description) LIKE ? OR LOWER(" . $studentNameExpr . ") LIKE ? )";
+                $params[] = '%' . strtolower($search) . '%';
+                $params[] = '%' . strtolower($search) . '%';
+            }
+
+            $severityOrderExpr = "CASE LOWER(COALESCE(severity_level, '')) WHEN 'major' THEN 1 WHEN 'moderate' THEN 2 WHEN 'minor' THEN 3 ELSE 4 END";
+
+            if ($sort === 'severity') {
+                $orderClause = $severityOrderExpr . ' ' . $orderDir . ', v.created_at DESC';
+            } else {
+                $orderClause = $orderBy . ' ' . $orderDir;
+            }
+
+            $query = "WITH filtered_violations AS (
+                          SELECT v.violation_id,
+                                 v.student_id,
+                                 vt.type_name,
+                                 vt.severity_level,
+                                 v.description,
+                                 v.date_of_violation,
+                                 v.created_at,
+                                 COUNT(*) OVER (PARTITION BY v.student_id) AS violation_count,
+                                 COALESCE(si.student_num, '') AS student_num,
+                                 COALESCE(NULLIF(LTRIM(RTRIM(CONCAT(COALESCE(si.last_name, ''), ', ', COALESCE(si.first_name, '')))), ','), '') AS student_name,
+                                 o.name AS officer_name,
+                                 ROW_NUMBER() OVER (
+                                     PARTITION BY v.student_id
+                                     ORDER BY v.created_at DESC, v.violation_id DESC
+                                 ) AS rn
+                            FROM violations v
+                            JOIN students s ON v.student_id = s.student_id
+                           LEFT JOIN student_information si ON s.student_id = si.student_id
+                            JOIN officers o ON v.officer_id = o.officer_id
+                           LEFT JOIN violation_types vt ON v.violation_type = vt.violation_type_id
+                           WHERE " . $where . "
+                      )
+                      SELECT violation_id,
+                             student_id,
+                             type_name,
+                             severity_level,
+                             description,
+                             date_of_violation,
+                             created_at,
+                                violation_count,
+                             student_num,
+                             student_name,
+                             officer_name
+                        FROM filtered_violations
+                       WHERE rn = 1
+                       ORDER BY " . $orderClause;
+
+            // Apply pagination depending on driver
+            if ($limit !== null) {
+                $limit = (int) $limit;
+                $offset = (int) $offset;
+                if ($this->isPgsql()) {
+                    $query .= " LIMIT $limit OFFSET $offset";
+                } else {
+                    // SQL Server: OFFSET FETCH requires ORDER BY which we have
+                    $query .= " OFFSET $offset ROWS FETCH NEXT $limit ROWS ONLY";
+                }
+            }
+
+            $stmt = $this->conn->prepare($query);
+            $stmt->execute($params);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        } catch (PDOException $e) {
+            error_log("Get All Violations Error: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    public function getAllViolationsCount($search = null)
+    {
+        try {
+            $where = $this->isEscalatedFalseCondition('v');
+            $params = [];
+            if (!empty($search)) {
+                $studentNameExpr = "COALESCE(NULLIF(LTRIM(RTRIM(CONCAT(COALESCE(si.last_name, ''), ', ', COALESCE(si.first_name, '')))), ','), '')";
+                $where .= " AND (LOWER(v.description) LIKE ? OR LOWER(" . $studentNameExpr . ") LIKE ? )";
+                $params[] = '%' . strtolower($search) . '%';
+                $params[] = '%' . strtolower($search) . '%';
+            }
+
+            $query = "SELECT COUNT(DISTINCT v.student_id) AS cnt
+                      FROM violations v
+                      JOIN students s ON v.student_id = s.student_id
+                     LEFT JOIN student_information si ON s.student_id = si.student_id
+                      LEFT JOIN violation_types vt ON v.violation_type = vt.violation_type_id
+                      WHERE " . $where;
+
+            $stmt = $this->conn->prepare($query);
+            $stmt->execute($params);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            return isset($row['cnt']) ? (int) $row['cnt'] : 0;
+        } catch (PDOException $e) {
+            error_log("Get All Violations Count Error: " . $e->getMessage());
+            return 0;
+        }
+    }
+
+    public function getAllViolationEvents($sort = 'created_at', $search = null, $dir = 'DESC')
     {
         try {
             $allowed = [
@@ -231,7 +411,7 @@ class ViolationModel
                              v.date_of_violation,
                              v.created_at,
                              COALESCE(si.student_num, '') AS student_num,
-                         COALESCE(NULLIF(LTRIM(RTRIM(CONCAT(COALESCE(si.last_name, ''), ', ', COALESCE(si.first_name, '')))), ','), '') AS student_name,
+                             COALESCE(NULLIF(LTRIM(RTRIM(CONCAT(COALESCE(si.last_name, ''), ', ', COALESCE(si.first_name, '')))), ','), '') AS student_name,
                              o.name as officer_name
                       FROM violations v
                       JOIN students s ON v.student_id = s.student_id
@@ -241,54 +421,13 @@ class ViolationModel
                       WHERE " . $where . "
                       ORDER BY " . $orderClause;
 
-            // Apply pagination depending on driver
-            if ($limit !== null) {
-                $limit = (int) $limit;
-                $offset = (int) $offset;
-                if ($this->isPgsql()) {
-                    $query .= " LIMIT $limit OFFSET $offset";
-                } else {
-                    // SQL Server: OFFSET FETCH requires ORDER BY which we have
-                    $query .= " OFFSET $offset ROWS FETCH NEXT $limit ROWS ONLY";
-                }
-            }
-
             $stmt = $this->conn->prepare($query);
             $stmt->execute($params);
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         } catch (PDOException $e) {
-            error_log("Get All Violations Error: " . $e->getMessage());
+            error_log("Get All Violation Events Error: " . $e->getMessage());
             return [];
-        }
-    }
-
-    public function getAllViolationsCount($search = null)
-    {
-        try {
-            $where = $this->isEscalatedFalseCondition('v');
-            $params = [];
-            if (!empty($search)) {
-                $studentNameExpr = "COALESCE(NULLIF(LTRIM(RTRIM(CONCAT(COALESCE(si.last_name, ''), ', ', COALESCE(si.first_name, '')))), ','), '')";
-                $where .= " AND (LOWER(v.description) LIKE ? OR LOWER(" . $studentNameExpr . ") LIKE ? )";
-                $params[] = '%' . strtolower($search) . '%';
-                $params[] = '%' . strtolower($search) . '%';
-            }
-
-            $query = "SELECT COUNT(*) AS cnt
-                      FROM violations v
-                      JOIN students s ON v.student_id = s.student_id
-                     LEFT JOIN student_information si ON s.student_id = si.student_id
-                      LEFT JOIN violation_types vt ON v.violation_type = vt.violation_type_id
-                      WHERE " . $where;
-
-            $stmt = $this->conn->prepare($query);
-            $stmt->execute($params);
-            $row = $stmt->fetch(PDO::FETCH_ASSOC);
-            return isset($row['cnt']) ? (int) $row['cnt'] : 0;
-        } catch (PDOException $e) {
-            error_log("Get All Violations Count Error: " . $e->getMessage());
-            return 0;
         }
     }
 

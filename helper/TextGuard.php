@@ -33,23 +33,61 @@ if (!function_exists('detectSelfHarmContent')) {
 if (!function_exists('isGibberishText')) {
     function isGibberishText($text)
     {
-        $letters = preg_match_all('/[a-z]/i', $text);
-        if ($letters < 12) {
-            return false;
-        }
-        $vowels = preg_match_all('/[aeiou]/i', $text);
-        $vowelRatio = $vowels / max(1, $letters);
-        if ($vowelRatio < 0.2) {
-            return true;
-        }
-        $compact = strtolower(preg_replace('/\s+/', '', $text));
-        if ($compact !== '' && strlen($compact) >= 12) {
-            $uniqueChars = count(array_unique(str_split($compact)));
-            if ($uniqueChars <= 3) {
+            $letters = preg_match_all('/[a-z]/i', $text);
+            // If not enough letters to judge, skip gibberish check (length validated elsewhere)
+            if ($letters < 8) {
+                return false;
+            }
+
+            // Vowel ratio: too few vowels => likely gibberish
+            $vowels = preg_match_all('/[aeiou]/i', $text);
+            $vowelRatio = $vowels / max(1, $letters);
+            if ($vowelRatio < 0.25) {
                 return true;
             }
-        }
-        return false;
+
+            // Digit-heavy strings are suspicious (e.g., hashes)
+            $digits = preg_match_all('/\d/', $text);
+            $digitRatio = $digits / max(1, ($letters + $digits));
+            if ($digitRatio > 0.25) {
+                return true;
+            }
+
+            // Long consonant runs indicate gibberish
+            if (preg_match('/[bcdfghjklmnpqrstvwxyz]{6,}/i', $text)) {
+                return true;
+            }
+
+            // Hex/hash-like sequences
+            if (preg_match('/[0-9a-f]{8,}/i', $text)) {
+                return true;
+            }
+
+            // Low character diversity over a long compacted string
+            $compact = strtolower(preg_replace('/\s+/', '', $text));
+            if ($compact !== '' && strlen($compact) >= 12) {
+                $uniqueChars = count(array_unique(str_split($compact)));
+                if ($uniqueChars <= 4) {
+                    return true;
+                }
+            }
+
+            // Most words too short / non-word proportion
+            $words = preg_split('/\s+/', trim($text));
+            if (is_array($words) && count($words) > 0) {
+                $longWords = 0;
+                foreach ($words as $w) {
+                    $clean = preg_replace('/[^a-zA-Z]/', '', $w);
+                    if (mb_strlen($clean) >= 3) {
+                        $longWords++;
+                    }
+                }
+                if (count($words) > 0 && ($longWords / count($words)) < 0.4) {
+                    return true;
+                }
+            }
+
+            return false;
     }
 }
 

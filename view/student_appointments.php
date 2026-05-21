@@ -459,14 +459,17 @@ function getStatusBadgeColor($status)
         const formData = new FormData(this);
 
         fetch(this.action || 'api/create_appointment.php', { method: 'POST', body: formData })
-            .then(r => r.json())
-            .then(data => {
-                if (!data.success) {
+            .then(async r => {
+                const data = await r.json().catch(() => ({}));
+                if (!r.ok || !data.success) {
                     throw new Error(data.message || 'Appointment submission failed');
                 }
+                return data;
+            })
+            .then(data => {
                 window.location.href = 'index.php?page=student_appointments&tab=history';
             })
-            .catch(() => showToast('Error submitting appointment.', 'danger'))
+            .catch(error => showToast(error.message || 'Error submitting appointment.', 'danger'))
             .finally(() => {
                 this.dataset.submitted = 'false';
                 if (submitBtn) submitBtn.disabled = false;
@@ -629,8 +632,11 @@ function getStatusBadgeColor($status)
             document.body.appendChild(c);
         }
         const toast = document.createElement('div');
-        toast.className = `alert alert-${type} alert-dismissible fade show shadow`;
-        toast.innerHTML = `${message}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+        // Use `toast-inline` to indicate this auto-dismiss toast has no close button
+        toast.className = `alert alert-${type} fade show shadow toast-inline`;
+        // Wrap message and escape HTML
+        const safe = escapeHtml(message);
+        toast.innerHTML = `<div class="toast-message">${safe}</div>`;
         c.appendChild(toast);
         setTimeout(() => toast.remove(), 4000);
     }

@@ -302,7 +302,7 @@ include 'view/partials/layout_top.php'; ?>
     </div>
   </div>
 
-  <p class="muted">Showing <?php echo count($violations); ?> violation record(s).</p>
+  <p class="muted">Showing <?php echo count($violations); ?> unique student record(s).</p>
 
   <div class="table-wrap">
     <table>
@@ -336,6 +336,7 @@ include 'view/partials/layout_top.php'; ?>
           </th>
           <th>Student Num</th>
           <th>Student</th>
+              <th>Total Violations</th>
           <th>Officer</th>
           <th><a href="<?php echo $makeLink('severity'); ?>">Severity <span
                 class="sort-arrow <?php echo $isActive('severity') ? 'active' : ''; ?>"><?php echo $getSortArrow('severity'); ?></span></a>
@@ -349,7 +350,7 @@ include 'view/partials/layout_top.php'; ?>
       <tbody>
         <?php if (empty($violations)): ?>
           <tr>
-            <td colspan="7">No violations found.</td>
+            <td colspan="8">No violations found.</td>
           </tr>
         <?php else: ?>
           <?php foreach ($violations as $v): ?>
@@ -357,6 +358,12 @@ include 'view/partials/layout_top.php'; ?>
               <td><?php echo htmlspecialchars($v['date_of_violation']); ?></td>
               <td><?php echo htmlspecialchars($v['student_num'] ?? '-'); ?></td>
               <td><?php echo htmlspecialchars($v['student_name']); ?></td>
+              <td>
+                <span class="pill">
+                  <?php echo (int) ($v['violation_count'] ?? 0); ?>
+                  <?php echo ((int) ($v['violation_count'] ?? 0) === 1) ? 'violation' : 'violations'; ?>
+                </span>
+              </td>
               <td><?php echo htmlspecialchars($v['officer_name']); ?></td>
               <td><?php echo htmlspecialchars(ucfirst($v['severity_level'] ?? 'Unknown')); ?></td>
               <td><?php echo nl2br(htmlspecialchars($v['description'] ?? '')); ?></td>

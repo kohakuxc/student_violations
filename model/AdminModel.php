@@ -92,9 +92,9 @@ class AdminModel
                   WHERE officer_id = ?";
         $stmt = $this->conn->prepare($query);
         return $stmt->execute([
-            $this->isPgsql() ? (bool) $isAdmin : ($isAdmin ? 1 : 0),
-            $this->isPgsql() ? (bool) $isSuperadmin : ($isSuperadmin ? 1 : 0),
-            $this->isPgsql() ? (bool) $canImportExcel : ($canImportExcel ? 1 : 0),
+                $isAdmin ? 1 : 0,
+                $isSuperadmin ? 1 : 0,
+                $canImportExcel ? 1 : 0,
             (int) $officer_id,
         ]);
     }

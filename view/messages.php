@@ -219,6 +219,109 @@ if (!$isOfficer) {
         cursor: pointer;
     }
 
+    .modal-backdrop {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .modal-backdrop.active {
+        display: flex;
+    }
+
+    .modal-content {
+        background: #fff;
+        border-radius: 12px;
+        padding: 24px;
+        max-width: 400px;
+        width: 90%;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    }
+
+    .modal-header {
+        font-size: 1.1rem;
+        font-weight: 700;
+        margin-bottom: 16px;
+        color: #0f172a;
+    }
+
+    .officers-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        max-height: 350px;
+        overflow-y: auto;
+    }
+
+    .recipient-tabs {
+        display: flex;
+        gap: 8px;
+        margin: 0 0 16px;
+    }
+
+    .recipient-tabs button {
+        flex: 1;
+        border: 1px solid #cbd5e1;
+        background: #f8fafc;
+        color: #334155;
+        border-radius: 999px;
+        padding: 8px 10px;
+        font-weight: 700;
+        cursor: pointer;
+    }
+
+    .recipient-tabs button.active {
+        background: #0b5793;
+        color: #fff;
+        border-color: #0b5793;
+    }
+
+    .officers-list li {
+        padding: 10px 12px;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        border: 1px solid #e5e7eb;
+        margin-bottom: 8px;
+    }
+
+    .officers-list li:hover {
+        background: #eff6ff;
+        border-color: #0b5793;
+    }
+
+    .modal-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 20px;
+    }
+
+    .modal-actions button {
+        flex: 1;
+        padding: 10px;
+        border-radius: 8px;
+        border: 1px solid #cbd5e1;
+        background: #fff;
+        color: #0f172a;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .modal-actions button.btn-close {
+        background: #f1f5f9;
+    }
+
+    .modal-actions button.btn-close:hover {
+        background: #e2e8f0;
+    }
+
     @media (max-width: 980px) {
         .messages-page {
             grid-template-columns: 1fr;
@@ -238,16 +341,14 @@ if (!$isOfficer) {
     <section class="messages-panel">
         <div class="messages-header">
             <h3>Conversations</h3>
-            <span id="messageUnreadTotal" class="badge bg-primary">0</span>
+            <span id="messageUnreadTotal" class="badge" style="background: #374151;">💬</span>
         </div>
 
-        <?php if (!$isOfficer && $assignedOfficerId > 0): ?>
-            <div class="messages-actions">
-                <button type="button" id="startConversationBtn" class="btn-start-chat">
-                    Start chat with <?php echo htmlspecialchars($assignedOfficerName ?: 'Assigned Officer'); ?>
-                </button>
-            </div>
-        <?php endif; ?>
+        <div class="messages-actions">
+            <button type="button" id="startConversationBtn" class="btn-start-chat">
+                + New Conversation
+            </button>
+        </div>
 
         <ul id="conversationList" class="conversation-list"></ul>
     </section>
@@ -268,6 +369,23 @@ if (!$isOfficer) {
     </section>
 </div>
 
+<!-- New Conversation Modal -->
+<div id="newConversationModal" class="modal-backdrop">
+    <div class="modal-content">
+        <div class="modal-header text-white" style="border-radius: 15px;">Start a New Conversation</div>
+        <?php if ($isOfficer): ?>
+            <div class="recipient-tabs" id="recipientTabs">
+                <button style="border-radius: 15px;" type="button" class="active" data-recipient-type="students">Students</button>
+                <button style="border-radius: 15px;" type="button" data-recipient-type="admins">Admins / Superadmins</button>
+            </div>
+        <?php endif; ?>
+        <ul id="officersList" class="officers-list"></ul>
+        <div class="modal-actions">
+            <button type="button" class="btn-close" id="closeModalBtn">Cancel</button>
+        </div>
+    </div>
+</div>
+
 <script>
 (function () {
     const currentUserId = <?php echo (int) $userId; ?>;
@@ -285,9 +403,14 @@ if (!$isOfficer) {
     const chatMetaEl = document.getElementById('chatMeta');
     const unreadTotalEl = document.getElementById('messageUnreadTotal');
     const startConversationBtn = document.getElementById('startConversationBtn');
+    const newConversationModal = document.getElementById('newConversationModal');
+    const officersListEl = document.getElementById('officersList');
+    const closeModalBtn = document.getElementById('closeModalBtn');
+    const recipientTabsEl = document.getElementById('recipientTabs');
 
     let conversations = [];
     let selectedConversationId = initiallySelectedConversationId || 0;
+    let activeRecipientType = 'students';
 
     function escapeHtml(str) {
         if (!str) return '';
@@ -320,7 +443,7 @@ if (!$isOfficer) {
         unreadTotalEl.textContent = String(totalUnread(conversations));
 
         conversationListEl.innerHTML = conversations.map(c => {
-            const title = currentUserRole === 'officer' ? (c.student_name || ('Student #' + c.student_id)) : (c.officer_name || ('Officer #' + c.officer_id));
+            const title = c.conversation_title || (currentUserRole === 'officer' ? (c.student_name || ('Conversation #' + c.conversation_id)) : (c.officer_name || ('Conversation #' + c.conversation_id)));
             const unread = Number(c.unread_count || 0);
             return `
                 <li class="conversation-item ${Number(c.conversation_id) === Number(selectedConversationId) ? 'active' : ''}" data-id="${Number(c.conversation_id)}">
@@ -402,9 +525,9 @@ if (!$isOfficer) {
 
         const selected = conversations.find(c => Number(c.conversation_id) === selectedConversationId);
         const title = selected
-            ? (currentUserRole === 'officer'
-                ? (selected.student_name || ('Student #' + selected.student_id))
-                : (selected.officer_name || ('Officer #' + selected.officer_id)))
+            ? (selected.conversation_title || (currentUserRole === 'officer'
+                ? (selected.student_name || ('Conversation #' + selected.conversation_id))
+                : (selected.officer_name || ('Conversation #' + selected.conversation_id))))
             : 'Conversation';
 
         chatTitleEl.textContent = title;
@@ -443,38 +566,100 @@ if (!$isOfficer) {
         }
     }
 
-    async function startConversation() {
-        if (currentUserRole !== 'student' || assignedOfficerId <= 0 || studentId <= 0) {
-            return;
+    function setActiveRecipientTab(recipientType) {
+        activeRecipientType = recipientType;
+        if (recipientTabsEl) {
+            recipientTabsEl.querySelectorAll('button').forEach(button => {
+                button.classList.toggle('active', button.dataset.recipientType === recipientType);
+            });
         }
-        if (!window.confirm('Start a new conversation with your assigned officer?')) {
-            return;
-        }
+    }
 
-        const body = new URLSearchParams({
-            officer_id: String(assignedOfficerId),
-            student_id: String(studentId)
-        });
+    async function loadRecipientList(recipientType) {
+        const endpoint = currentUserRole === 'student'
+            ? 'api/messages.php?action=getAvailableOfficers'
+            : 'api/messages.php?action=getAvailableRecipients&recipient_type=' + encodeURIComponent(recipientType);
 
-        const res = await fetch('api/messages.php?action=getOrCreateConversation', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || ''
-            },
-            body: body.toString()
-        });
+        const res = await fetch(endpoint);
         const data = await res.json();
 
-        if (!data.success) {
-            alert(data.message || 'Unable to start conversation right now.');
+        if (!data.success || !Array.isArray(data.data) || data.data.length === 0) {
+            alert('No recipients available at this time.');
             return;
         }
 
-        selectedConversationId = Number(data.conversation_id || 0);
-        await fetchConversations();
-        if (selectedConversationId > 0) {
-            await openConversation(selectedConversationId);
+        const recipients = data.data;
+        officersListEl.innerHTML = recipients.map(recipient => {
+            const recipientId = Number(recipient.officer_id || recipient.student_id || 0);
+            return `
+                <li data-recipient-id="${recipientId}">
+                    ${escapeHtml(recipient.name || ('Recipient #' + recipientId))}
+                </li>
+            `;
+        }).join('');
+
+        officersListEl.querySelectorAll('li').forEach(item => {
+            item.addEventListener('click', async function () {
+                const recipientId = Number(this.dataset.recipientId || 0);
+                if (recipientId <= 0) return;
+
+                newConversationModal.classList.remove('active');
+                await startConversationWithRecipient(recipientType, recipientId);
+            });
+        });
+
+        newConversationModal.classList.add('active');
+    }
+
+    async function startConversation() {
+        if (currentUserRole === 'student') {
+            await loadRecipientList('officer');
+            return;
+        }
+
+        setActiveRecipientTab('students');
+        await loadRecipientList('students');
+    }
+
+    async function startConversationWithRecipient(recipientType, recipientId) {
+        if (recipientId <= 0) {
+            return;
+        }
+
+        const apiRecipientType = recipientType === 'students' ? 'student' : 'officer';
+        const body = currentUserRole === 'student'
+            ? new URLSearchParams({
+                officer_id: String(recipientId),
+                student_id: String(studentId)
+            })
+            : new URLSearchParams({
+                recipient_type: apiRecipientType,
+                recipient_id: String(recipientId)
+            });
+
+        try {
+            const res = await fetch('api/messages.php?action=getOrCreateConversation', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || ''
+                },
+                body: body.toString()
+            });
+            const data = await res.json();
+
+            if (!data.success) {
+                alert(data.message || 'Unable to start conversation right now.');
+                return;
+            }
+
+            selectedConversationId = Number(data.conversation_id || 0);
+            await fetchConversations();
+            if (selectedConversationId > 0) {
+                await openConversation(selectedConversationId);
+            }
+        } catch (err) {
+            alert(err.message || 'Unable to start conversation right now.');
         }
     }
 
@@ -501,10 +686,32 @@ if (!$isOfficer) {
     if (startConversationBtn) {
         startConversationBtn.addEventListener('click', function () {
             startConversation().catch(() => {
-                alert('Unable to start conversation right now.');
+                alert('Unable to load officers right now.');
             });
         });
     }
+
+    if (recipientTabsEl) {
+        recipientTabsEl.querySelectorAll('button').forEach(button => {
+            button.addEventListener('click', async function () {
+                const recipientType = String(this.dataset.recipientType || 'students');
+                setActiveRecipientTab(recipientType);
+                await loadRecipientList(recipientType);
+            });
+        });
+    }
+
+    if (closeModalBtn) {
+        closeModalBtn.addEventListener('click', function () {
+            newConversationModal.classList.remove('active');
+        });
+    }
+
+    newConversationModal.addEventListener('click', function (e) {
+        if (e.target === newConversationModal) {
+            newConversationModal.classList.remove('active');
+        }
+    });
 
     async function init() {
         try {

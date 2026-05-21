@@ -120,7 +120,14 @@ try {
     
     $appointmentModel = new AppointmentModel();
     debug_log("AppointmentModel instantiated");
-    
+    // Enforce cancellation-based anti-spam rule:
+    // If the student has cancelled >= 2 times (student-initiated), prevent new requests.
+    $cancelCount = $appointmentModel->getStudentCancellationCount((int) $_SESSION['student_id']);
+    if ($cancelCount >= 2) {
+        debug_log("ANTI-SPAM: student {$_SESSION['student_id']} exceeded cancel limit ({$cancelCount})", true);
+        throw new Exception('You have cancelled appointments multiple times. You cannot request another appointment.');
+    }
+
     $result = $appointmentModel->createAppointment(
         $_SESSION['student_id'],
         $category_id,
