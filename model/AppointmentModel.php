@@ -163,7 +163,7 @@ class AppointmentModel
                     status,
                     is_self_harm,
                     created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)";
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)";
 
             $log('SQL Query prepared');
 
@@ -177,7 +177,8 @@ class AppointmentModel
 
             $status = 'pending';
             $officer_id = $this->getDefaultOfficerId();
-            $result = $stmt->execute([
+
+            $params = [
                 (int) $student_id,
                 (int) $officer_id,
                 (int) $category_id,
@@ -185,14 +186,23 @@ class AppointmentModel
                 (string) $description,
                 (string) $appointment_date,
                 (string) $scheduled_datetime,
-                (string) $evidence_image,
+                $evidence_image !== null ? (string) $evidence_image : null,
                 (string) $status,
-                $this->isPgsql() ? (bool) $is_self_harm : ($is_self_harm ? 1 : 0),
-            ]);
+                (int) ($is_self_harm ? 1 : 0),
+            ];
+
+            // Diagnostic logging for parameter/placeholder mismatch
+            $placeholderCount = substr_count($query, '?');
+            $log('EXEC PARAMS COUNT: ' . count($params));
+            $log('EXEC PLACEHOLDERS COUNT: ' . $placeholderCount);
+            $log('EXEC PARAMS: ' . json_encode($params));
+
+            $result = $stmt->execute($params);
 
             if (!$result) {
                 $error_info = $stmt->errorInfo();
-                $log("EXECUTE ERROR: " . $error_info[2], true);
+                $log("EXECUTE ERROR: " . ($error_info[2] ?? json_encode($error_info)), true);
+                $log('QUERY STRING: ' . ($stmt->queryString ?? $query), true);
                 return false;
             }
 
@@ -278,6 +288,23 @@ class AppointmentModel
                 'completed_this_month' => 0,
                 'total_count' => 0
             ];
+        }
+    }
+
+    /**
+     * Count how many times a student has cancelled appointments (student-initiated)
+     */
+    public function getStudentCancellationCount($student_id)
+    {
+        try {
+            $query = "SELECT COUNT(*) as count FROM appointments WHERE student_id = ? AND status = 'cancelled' AND locked_by_role = 'student'";
+            $stmt = $this->conn->prepare($query);
+            $stmt->execute([(int) $student_id]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            return (int) ($row['count'] ?? 0);
+        } catch (Exception $e) {
+            error_log('Error getting student cancellation count: ' . $e->getMessage());
+            return 0;
         }
     }
 

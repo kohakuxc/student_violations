@@ -29,5 +29,42 @@ class ViolationTypeModel
             return [];
         }
     }
+
+    public function findActiveViolationTypeByLookup($lookup)
+    {
+        try {
+            $lookup = trim((string) $lookup);
+            if ($lookup === '') {
+                return null;
+            }
+
+            $normalizedLookup = strtolower(preg_replace('/\s+/', ' ', $lookup));
+            $types = $this->getActiveViolationTypes();
+            foreach ($types as $type) {
+                if ((string) ($type['violation_type_id'] ?? '') === $lookup) {
+                    return $type;
+                }
+            }
+
+            foreach ($types as $type) {
+                $typeName = trim((string) ($type['type_name'] ?? ''));
+                $normalizedName = strtolower(preg_replace('/\s+/', ' ', $typeName));
+                $aliasList = [$normalizedName, strtolower($typeName)];
+
+                if (strtolower((string) ($type['severity_level'] ?? '')) === 'minor') {
+                    $aliasList[] = 'minor';
+                }
+
+                if (in_array($normalizedLookup, $aliasList, true)) {
+                    return $type;
+                }
+            }
+
+            return null;
+        } catch (Exception $e) {
+            error_log("Find Violation Type Error: " . $e->getMessage());
+            return null;
+        }
+    }
 }
 ?>

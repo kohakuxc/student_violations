@@ -60,7 +60,7 @@ function ensureConversationParticipant(PDO $conn, $conversation_id, $user_id, $u
 
 function userCanAccessConversation(PDO $conn, $conversation_id, $user_id, $user_role)
 {
-    $query = "SELECT student_id, officer_id
+    $query = "SELECT student_id, officer_id, other_officer_id, conversation_kind
               FROM conversations
               WHERE conversation_id = ?";
     $stmt = $conn->prepare($query);
@@ -73,7 +73,15 @@ function userCanAccessConversation(PDO $conn, $conversation_id, $user_id, $user_
     if ($user_role === 'student' && (int) $row['student_id'] !== (int) $user_id) {
         return false;
     }
-    if ($user_role === 'officer' && (int) $row['officer_id'] !== (int) $user_id) {
+    if ($user_role === 'officer') {
+        $matchesPrimaryOfficer = (int) $row['officer_id'] === (int) $user_id;
+        $matchesSecondaryOfficer = (int) ($row['other_officer_id'] ?? 0) === (int) $user_id;
+        if (!$matchesPrimaryOfficer && !$matchesSecondaryOfficer) {
+            return false;
+        }
+    }
+
+    if ($user_role === 'student' && (string) ($row['conversation_kind'] ?? 'student_officer') === 'officer_officer') {
         return false;
     }
 
@@ -190,27 +198,104 @@ try {
             ]);
             break;
 
+        case 'getAvailableOfficers':
+            if ($user_role !== 'student') {
+                throw new Exception('Only students can request available officers');
+            }
+            $driver = $conn->getAttribute(PDO::ATTR_DRIVER_NAME);
+            if ($driver === 'pgsql') {
+                $query = "(SELECT officer_id, name FROM officers WHERE COALESCE(is_active, false) = true AND COALESCE(is_superadmin, false) = true LIMIT 1)
+                          UNION ALL
+                          (SELECT officer_id, name FROM officers WHERE COALESCE(is_active, false) = true AND COALESCE(is_superadmin, false) = false)
+                          ORDER BY name ASC";
+            } else {
+                $query = "(SELECT TOP 1 officer_id, name FROM officers WHERE ISNULL(is_active, 0) = 1 AND ISNULL(is_superadmin, 0) = 1)
+                          UNION ALL
+                          (SELECT officer_id, name FROM officers WHERE ISNULL(is_active, 0) = 1 AND ISNULL(is_superadmin, 0) = 0)
+                          ORDER BY name ASC";
+            }
+            $stmt = $conn->prepare($query);
+            $stmt->execute();
+            $officers = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            echo json_encode(['success' => true, 'data' => $officers]);
+            break;
+
+        case 'getAvailableRecipients':
+            if ($user_role !== 'officer') {
+                throw new Exception('Only officers can request these recipients');
+            }
+
+            $recipient_type = (string) ($_GET['recipient_type'] ?? 'students');
+            if (!in_array($recipient_type, ['students', 'admins'], true)) {
+                throw new Exception('Invalid recipient type');
+            }
+
+            $recipients = $messageModel->getAvailableRecipients($recipient_type, $user_id);
+            echo json_encode(['success' => true, 'data' => $recipients]);
+            break;
+
         case 'getOrCreateConversation':
             $officer_id = (int) ($_POST['officer_id'] ?? 0);
             $student_id = (int) ($_POST['student_id'] ?? 0);
-
-            if (!$officer_id || !$student_id) {
-                throw new Exception('Officer ID and student ID required');
-            }
+            $recipient_type = (string) ($_POST['recipient_type'] ?? 'officer');
+            $recipient_id = (int) ($_POST['recipient_id'] ?? 0);
 
             if ($user_role === 'student') {
-                $student_id = (int) $_SESSION['student_id'];
-                if (!hasStudentOfficerAppointmentPair($conn, $student_id, $officer_id)) {
-                    throw new Exception('You can only message your assigned officer.');
+                if (!$officer_id || !$student_id) {
+                    throw new Exception('Officer ID and student ID required');
                 }
+
+                $student_id = (int) $_SESSION['student_id'];
+                $driver = $conn->getAttribute(PDO::ATTR_DRIVER_NAME);
+                if ($driver === 'pgsql') {
+                    $query = "SELECT COUNT(*) AS cnt FROM officers WHERE officer_id = ? AND COALESCE(is_active, false) = true";
+                } else {
+                    $query = "SELECT COUNT(*) AS cnt FROM officers WHERE officer_id = ? AND ISNULL(is_active, 0) = 1";
+                }
+                $stmt = $conn->prepare($query);
+                $stmt->execute([(int) $officer_id]);
+                $row = $stmt->fetch(PDO::FETCH_ASSOC);
+                if (((int) ($row['cnt'] ?? 0)) === 0) {
+                    throw new Exception('Invalid officer selection.');
+                }
+
+                $conversation_id = $messageModel->getOrCreateConversation($student_id, $officer_id, $user_role);
             } else {
-                $officer_id = (int) $_SESSION['officer_id'];
-                if (!hasStudentOfficerAppointmentPair($conn, $student_id, $officer_id)) {
-                    throw new Exception('Officer and student are not assigned together.');
+                if (!in_array($recipient_type, ['student', 'officer'], true) || !$recipient_id) {
+                    throw new Exception('Recipient type and recipient ID required');
+                }
+
+                if ($recipient_type === 'student') {
+                    $query = "SELECT COUNT(*) AS cnt FROM students WHERE student_id = ?";
+                    $stmt = $conn->prepare($query);
+                    $stmt->execute([(int) $recipient_id]);
+                    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+                    if (((int) ($row['cnt'] ?? 0)) === 0) {
+                        throw new Exception('Invalid student selection.');
+                    }
+
+                    $conversation_id = $messageModel->getOrCreateConversation($recipient_id, $user_id, 'officer');
+                } else {
+                    if ($recipient_id === (int) $user_id) {
+                        throw new Exception('You cannot start a conversation with yourself.');
+                    }
+
+                    $query = "SELECT COUNT(*) AS cnt
+                              FROM officers
+                              WHERE officer_id = ?
+                                AND COALESCE(is_active, false) = true
+                                AND (COALESCE(is_admin, false) = true OR COALESCE(is_superadmin, false) = true)";
+                    $stmt = $conn->prepare($query);
+                    $stmt->execute([(int) $recipient_id]);
+                    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+                    if (((int) ($row['cnt'] ?? 0)) === 0) {
+                        throw new Exception('Invalid admin or superadmin selection.');
+                    }
+
+                    $conversation_id = $messageModel->getOrCreateConversation(0, $user_id, 'officer', $recipient_id);
                 }
             }
 
-            $conversation_id = $messageModel->getOrCreateConversation($student_id, $officer_id, $user_role);
             if (!$conversation_id) {
                 throw new Exception('Failed to get or create conversation');
             }

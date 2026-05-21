@@ -45,33 +45,138 @@ class MessageModel
         $this->conn = $this->resolveConnection();
     }
 
-    // Get or create conversation between student and their assigned officer
-    public function getOrCreateConversation($student_id, $officer_id, $initiated_by_role = 'student')
+    public function getAvailableStudentsForConversation()
     {
         try {
-            // Check if conversation exists
-            $query = "SELECT conversation_id FROM conversations 
-                      WHERE student_id = ? AND officer_id = ?";
-            $stmt = $this->conn->prepare($query);
-            $stmt->execute([(int) $student_id, (int) $officer_id]);
-            $result = $stmt->fetch(\PDO::FETCH_ASSOC);
-
-            if ($result) {
-                return (int) $result['conversation_id'];
+            if ($this->isPgsql()) {
+                $query = "SELECT s.student_id,
+                                 COALESCE(NULLIF(LTRIM(RTRIM(CONCAT(COALESCE(si.last_name, ''), ', ', COALESCE(si.first_name, '')))), ','), CAST(s.student_id AS VARCHAR(50))) as name,
+                                 si.student_num,
+                                 si.email
+                          FROM students s
+                          LEFT JOIN student_information si ON si.student_id = s.student_id
+                          ORDER BY name ASC";
+            } else {
+                $query = "SELECT s.student_id,
+                                 COALESCE(NULLIF(LTRIM(RTRIM(CONCAT(COALESCE(si.last_name, ''), ', ', COALESCE(si.first_name, '')))), ','), CAST(s.student_id AS VARCHAR(50))) as name,
+                                 si.student_num,
+                                 si.email
+                          FROM students s
+                          LEFT JOIN student_information si ON si.student_id = s.student_id
+                          ORDER BY name ASC";
             }
 
-            // Create new conversation
-            $query = "INSERT INTO conversations (student_id, officer_id, initiated_by_role, created_at, updated_at)
-                      VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)";
+            $stmt = $this->conn->prepare($query);
+            $stmt->execute();
+            return $stmt->fetchAll(
+                \PDO::FETCH_ASSOC
+            );
+        } catch (Exception $e) {
+            error_log("Error getting available students: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    public function getAvailableAdminRecipients($current_officer_id)
+    {
+        try {
+            $query = "SELECT officer_id,
+                             COALESCE(NULLIF(TRIM(COALESCE(name, '')), ''), COALESCE(username, CAST(officer_id AS VARCHAR(50)))) as name,
+                             username,
+                             is_admin,
+                             is_superadmin
+                      FROM officers
+                      WHERE COALESCE(is_active, false) = true
+                        AND (COALESCE(is_admin, false) = true OR COALESCE(is_superadmin, false) = true)
+                        AND officer_id <> ?
+                      ORDER BY COALESCE(is_superadmin, false) DESC,
+                               COALESCE(is_admin, false) DESC,
+                               name ASC";
 
             $stmt = $this->conn->prepare($query);
-            $stmt->execute([(int) $student_id, (int) $officer_id, (string) $initiated_by_role]);
-            $conversation_id = (int) $this->conn->lastInsertId();
+            $stmt->execute([(int) $current_officer_id]);
+            return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        } catch (Exception $e) {
+            error_log("Error getting admin recipients: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    public function getAvailableRecipients($recipient_type, $current_officer_id = null)
+    {
+        if ($recipient_type === 'students') {
+            return $this->getAvailableStudentsForConversation();
+        }
+
+        if ($recipient_type === 'admins') {
+            return $this->getAvailableAdminRecipients($current_officer_id ?? 0);
+        }
+
+        return [];
+    }
+
+    // Get or create conversation between student and their assigned officer
+    public function getOrCreateConversation($student_id, $officer_id, $initiated_by_role = 'student', $other_officer_id = null)
+    {
+        try {
+            $conversationKind = ($initiated_by_role === 'officer' && $other_officer_id !== null)
+                ? 'officer_officer'
+                : 'student_officer';
+
+            if ($conversationKind === 'officer_officer') {
+                $primaryOfficerId = min((int) $officer_id, (int) $other_officer_id);
+                $secondaryOfficerId = max((int) $officer_id, (int) $other_officer_id);
+
+                $query = "SELECT conversation_id FROM conversations
+                          WHERE conversation_kind = 'officer_officer'
+                            AND officer_id = ?
+                            AND other_officer_id = ?";
+                $stmt = $this->conn->prepare($query);
+                $stmt->execute([$primaryOfficerId, $secondaryOfficerId]);
+                $result = $stmt->fetch(\PDO::FETCH_ASSOC);
+
+                if ($result) {
+                    return (int) $result['conversation_id'];
+                }
+
+                $query = "INSERT INTO conversations (student_id, officer_id, other_officer_id, conversation_kind, initiated_by_role, created_at, updated_at)
+                          VALUES (NULL, ?, ?, 'officer_officer', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)";
+                $stmt = $this->conn->prepare($query);
+                $stmt->execute([$primaryOfficerId, $secondaryOfficerId, (string) $initiated_by_role]);
+            } else {
+                $query = "SELECT conversation_id FROM conversations
+                          WHERE conversation_kind = 'student_officer'
+                            AND student_id = ? AND officer_id = ?";
+                $stmt = $this->conn->prepare($query);
+                $stmt->execute([(int) $student_id, (int) $officer_id]);
+                $result = $stmt->fetch(\PDO::FETCH_ASSOC);
+
+                if ($result) {
+                    return (int) $result['conversation_id'];
+                }
+
+                $query = "INSERT INTO conversations (student_id, officer_id, other_officer_id, conversation_kind, initiated_by_role, created_at, updated_at)
+                          VALUES (?, ?, NULL, 'student_officer', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)";
+
+                $stmt = $this->conn->prepare($query);
+                $stmt->execute([(int) $student_id, (int) $officer_id, (string) $initiated_by_role]);
+            }
+
+            if ($this->isPgsql()) {
+                $conversation_id = (int) $this->conn->lastInsertId('conversations_conversation_id_seq');
+            } else {
+                $conversation_id = (int) $this->conn->lastInsertId();
+            }
 
             if ($conversation_id > 0) {
                 // Add participants
-                $this->addParticipant($conversation_id, $student_id, 'student');
-                $this->addParticipant($conversation_id, $officer_id, 'officer');
+                if ($conversationKind === 'officer_officer') {
+                    $this->addParticipant($conversation_id, $primaryOfficerId, 'officer');
+                    $this->addParticipant($conversation_id, $secondaryOfficerId, 'officer');
+                } else {
+                    $this->addParticipant($conversation_id, $student_id, 'student');
+                    $this->addParticipant($conversation_id, $officer_id, 'officer');
+                }
 
                 return $conversation_id;
             }
@@ -126,6 +231,8 @@ class MessageModel
                       VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)";
 
             $stmt = $this->conn->prepare($query);
+            $isSelfHarmParam = $is_self_harm ? 1 : 0;
+
             $stmt->execute([
                 (int) $conversation_id,
                 (int) $sender_id,
@@ -133,10 +240,14 @@ class MessageModel
                 (string) $message_body,
                 (string) ($attachment_path ?? ''),
                 (string) ($attachment_filename ?? ''),
-                $this->isPgsql() ? (bool) $is_self_harm : ($is_self_harm ? 1 : 0),
+                $isSelfHarmParam,
             ]);
 
-            $message_id = (int) $this->conn->lastInsertId();
+            if ($this->isPgsql()) {
+                $message_id = (int) $this->conn->lastInsertId('messages_message_id_seq');
+            } else {
+                $message_id = (int) $this->conn->lastInsertId();
+            }
 
             // Update conversation last_message_at
             $query = "UPDATE conversations 
@@ -145,13 +256,12 @@ class MessageModel
             $stmt = $this->conn->prepare($query);
             $stmt->execute([(int) $conversation_id]);
 
-            // Increment unread count for recipient
-            $recipient_role = $sender_role === 'student' ? 'officer' : 'student';
+                // Increment unread count for every participant except the sender.
             $query = "UPDATE conversation_participants 
                       SET unread_count = unread_count + 1, updated_at = CURRENT_TIMESTAMP
-                      WHERE conversation_id = ? AND user_role = ?";
+                      WHERE conversation_id = ? AND NOT (user_role = ? AND user_id = ?)";
             $stmt = $this->conn->prepare($query);
-            $stmt->execute([(int) $conversation_id, (string) $recipient_role]);
+                $stmt->execute([(int) $conversation_id, (string) $sender_role, (int) $sender_id]);
 
             $this->conn->commit();
             return $message_id > 0 ? $message_id : null;
@@ -221,10 +331,10 @@ class MessageModel
             $query = "UPDATE messages 
                       SET is_read = true, read_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
                       WHERE conversation_id = ? AND is_read = false 
-                      AND sender_role != ?";
+                      AND NOT (sender_role = ? AND sender_id = ?)";
 
             $stmt = $this->conn->prepare($query);
-            $stmt->execute([(int) $conversation_id, (string) $user_role]);
+            $stmt->execute([(int) $conversation_id, (string) $user_role, (int) $user_id]);
 
             // Reset unread count for participant
             $query = "UPDATE conversation_participants 
@@ -249,38 +359,80 @@ class MessageModel
         try {
             $isStudent = $user_role === 'student';
             $baseSelect = $isStudent
-                ? "SELECT c.conversation_id, c.student_id, c.officer_id, c.subject, c.last_message_at, 
+                ? "SELECT c.conversation_id, c.student_id, c.officer_id, c.other_officer_id, c.conversation_kind, c.subject, c.last_message_at,
                           c.is_archived_by_student, c.created_at,
-                          o.name as officer_name,
+                          COALESCE(NULLIF(LTRIM(RTRIM(CONCAT(COALESCE(o.name, ''), ''))), ''), CAST(c.officer_id AS VARCHAR(50))) as officer_name,
                           COALESCE(cp.unread_count, 0) as unread_count
                    FROM conversations c
-                   JOIN officers o ON c.officer_id = o.officer_id
-                   LEFT JOIN conversation_participants cp ON c.conversation_id = cp.conversation_id 
+                   LEFT JOIN officers o ON c.officer_id = o.officer_id
+                   LEFT JOIN conversation_participants cp ON c.conversation_id = cp.conversation_id
                           AND cp.user_id = ? AND cp.user_role = 'student'
-                   WHERE c.student_id = ? AND c.is_archived_by_student = false"
-                : "SELECT c.conversation_id, c.student_id, c.officer_id, c.subject, c.last_message_at,
+                   WHERE c.student_id = ? AND COALESCE(c.conversation_kind, 'student_officer') = 'student_officer' AND c.is_archived_by_student = false"
+                : "SELECT c.conversation_id, c.student_id, c.officer_id, c.other_officer_id, c.conversation_kind, c.subject, c.last_message_at,
                           c.is_archived_by_officer, c.created_at,
-                          COALESCE(NULLIF(LTRIM(RTRIM(CONCAT(COALESCE(si.last_name, ''), ', ', COALESCE(si.first_name, '')))), ','), CAST(st.student_id AS VARCHAR(50))) as student_name,
+                          COALESCE(NULLIF(LTRIM(RTRIM(CONCAT(COALESCE(sti.last_name, ''), ', ', COALESCE(sti.first_name, '')))), ','), CAST(st.student_id AS VARCHAR(50))) as student_name,
+                          COALESCE(NULLIF(TRIM(COALESCE(primary_o.name, '')), ''), COALESCE(primary_o.username, CAST(primary_o.officer_id AS VARCHAR(50)))) as officer_name,
+                          COALESCE(NULLIF(TRIM(COALESCE(secondary_o.name, '')), ''), COALESCE(secondary_o.username, CAST(secondary_o.officer_id AS VARCHAR(50)))) as other_officer_name,
                           COALESCE(cp.unread_count, 0) as unread_count
                    FROM conversations c
-                   JOIN students st ON c.student_id = st.student_id
-                   LEFT JOIN student_information si ON st.student_id = si.student_id
-                   LEFT JOIN conversation_participants cp ON c.conversation_id = cp.conversation_id 
+                   LEFT JOIN students st ON c.student_id = st.student_id
+                   LEFT JOIN student_information sti ON st.student_id = sti.student_id
+                   LEFT JOIN officers primary_o ON c.officer_id = primary_o.officer_id
+                   LEFT JOIN officers secondary_o ON c.other_officer_id = secondary_o.officer_id
+                   LEFT JOIN conversation_participants cp ON c.conversation_id = cp.conversation_id
                           AND cp.user_id = ? AND cp.user_role = 'officer'
-                   WHERE c.officer_id = ? AND c.is_archived_by_officer = false";
+                   WHERE (c.officer_id = ? OR c.other_officer_id = ?) AND COALESCE(c.is_archived_by_officer, false) = false";
 
             if ($this->isPgsql()) {
                 $query = $baseSelect . " ORDER BY c.last_message_at DESC NULLS LAST, c.created_at DESC LIMIT ? OFFSET ?";
                 $stmt = $this->conn->prepare($query);
-                $stmt->execute([(int) $user_id, (int) $user_id, (int) $limit, (int) $offset]);
+                if ($isStudent) {
+                    $stmt->execute([(int) $user_id, (int) $user_id, (int) $limit, (int) $offset]);
+                } else {
+                    $stmt->execute([(int) $user_id, (int) $user_id, (int) $user_id, (int) $limit, (int) $offset]);
+                }
             } else {
                 $query = $baseSelect . " ORDER BY CASE WHEN c.last_message_at IS NULL THEN 1 ELSE 0 END,
                                           c.last_message_at DESC, c.created_at DESC
                                           OFFSET ? ROWS FETCH NEXT ? ROWS ONLY";
                 $stmt = $this->conn->prepare($query);
-                $stmt->execute([(int) $user_id, (int) $user_id, (int) $offset, (int) $limit]);
+                if ($isStudent) {
+                    $stmt->execute([(int) $user_id, (int) $user_id, (int) $offset, (int) $limit]);
+                } else {
+                    $stmt->execute([(int) $user_id, (int) $user_id, (int) $user_id, (int) $offset, (int) $limit]);
+                }
             }
-            return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+            if (!$isStudent) {
+                foreach ($rows as &$row) {
+                    $kind = (string) ($row['conversation_kind'] ?? 'student_officer');
+                    if ($kind === 'officer_officer') {
+                        if ((int) ($row['officer_id'] ?? 0) === (int) $user_id) {
+                            $row['conversation_title'] = (string) ($row['other_officer_name'] ?? $row['other_officer_id'] ?? 'Officer');
+                            $row['counterpart_id'] = (int) ($row['other_officer_id'] ?? 0);
+                        } else {
+                            $row['conversation_title'] = (string) ($row['officer_name'] ?? $row['officer_id'] ?? 'Officer');
+                            $row['counterpart_id'] = (int) ($row['officer_id'] ?? 0);
+                        }
+                        $row['counterpart_role'] = 'officer';
+                    } else {
+                        $row['conversation_title'] = (string) ($row['student_name'] ?? $row['student_id'] ?? 'Student');
+                        $row['counterpart_id'] = (int) ($row['student_id'] ?? 0);
+                        $row['counterpart_role'] = 'student';
+                    }
+                }
+                unset($row);
+            } else {
+                foreach ($rows as &$row) {
+                    $row['conversation_title'] = (string) ($row['officer_name'] ?? $row['officer_id'] ?? 'Officer');
+                    $row['counterpart_id'] = (int) ($row['officer_id'] ?? 0);
+                    $row['counterpart_role'] = 'officer';
+                }
+                unset($row);
+            }
+
+            return $rows;
         } catch (Exception $e) {
             error_log("Error getting user conversations: " . $e->getMessage());
             return [];

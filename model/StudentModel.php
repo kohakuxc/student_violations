@@ -298,6 +298,16 @@ class StudentModel
      */
     public function findStudentByLookup($search_term)
     {
+        $search_term = trim((string) $search_term);
+        if ($search_term === '') {
+            return null;
+        }
+
+        $exactStudent = $this->getStudentByNumber($search_term);
+        if ($exactStudent) {
+            return $exactStudent;
+        }
+
         return $this->searchStudent($search_term);
     }
 

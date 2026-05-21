@@ -37,7 +37,7 @@ $totalRecords = $violationModel->getAllViolationsCount($search);
 
 if ($export === 'csv') {
     // Export current filtered results as CSV
-    $allRows = $violationModel->getAllViolations($sort, $search, $dir, null, 0);
+    $allRows = $violationModel->getAllViolationEvents($sort, $search, $dir);
     
     header('Content-Type: text/csv; charset=utf-8');
     header('Content-Disposition: attachment; filename=violations_export.csv');

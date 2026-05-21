@@ -317,7 +317,7 @@ require_once __DIR__ . '/../helper/CsrfHelper.php';
                 </div>
 
                 <div class="student-login">
-                    <h1 style="text-align: center; font-size: 22px; color: #2c3e50; margin: 0 0 8px;">Student Login</h1>
+                    <h1 style="text-align: center; font-size: 22px; color: #2c3e50; margin: 0 0 8px;">AXcelerate</h1>
                     <p style="text-align: center; color: #666; font-size: 13px; margin: 0 0 18px;">
                         Sign in with your Fairview STI email
                     </p>
